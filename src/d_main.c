@@ -876,14 +876,22 @@ static void IdentifyVersion(void)
 	// if you change the ordering of this or add/remove a file, be sure to update the md5
 	// checking in D_SRB2Main
 
-	// Add the maps
-	D_AddFile(va(pandf,srb2waddir,"zones.pk3"));
+	// Main code:
+	D_AddFile(va(pandf,srb2waddir,"SRB2P-main.pk3"));
+
+	// Graphics (sprites, textures [...])
+	D_AddFile(va(pandf,srb2waddir,"SRB2P-graphics.pk3"));
+
+	// This is a .wad because pk3 hardly saves any space there, and it's more convenient to edit.
+	D_AddFile(va(pandf,srb2waddir,"SRB2P-maps.wad"));
 
 	// Add the players
-	D_AddFile(va(pandf,srb2waddir, "player.dta"));
+	D_AddFile(va(pandf,srb2waddir, "SRB2P-chars.wad"));
+
 
 #ifdef USE_PATCH_DTA
 	// Add our crappy patches to fix our bugs
+	// Left in SRB2P for ease.
 	D_AddFile(va(pandf,srb2waddir,"patch.pk3"));
 #endif
 
@@ -900,11 +908,12 @@ static void IdentifyVersion(void)
 		}
 
 		MUSICTEST("music.dta")
-#ifdef DEVELOP // remove when music_new.dta is merged into music.dta
-		MUSICTEST("music_new.dta")
-#endif
+		MUSICTEST("SRB2P-music.wad")
+		MUSICTEST("SRB2P-sounds.wad")
 	}
 #endif
+
+D_AddFile(va(pandf,srb2waddir,"SRB2P-patch.pk3"));	// SRB2P Patch. Used to patch quick things, always added last.
 }
 
 #ifdef PC_DOS
