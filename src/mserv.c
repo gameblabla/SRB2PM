@@ -297,7 +297,6 @@ static INT32 GetServersList(void)
 {
 	msg_t msg;
 	INT32 count = 0;
-
 	msg.type = GET_SERVER_MSG;
 	msg.length = 0;
 	msg.room = 0;
@@ -314,6 +313,8 @@ static INT32 GetServersList(void)
 		}
 		count++;
 		CONS_Printf("%s",msg.buffer);
+		if (msg.length + strlen(listservresult) < LISTSERVLEN-1)
+			strcat(listservresult, msg.buffer);
 	}
 
 	return MS_READ_ERROR;
@@ -641,6 +642,9 @@ void GetMODVersion_Console(void)
   */
 static void Command_Listserv_f(void)
 {
+	strcpy(listservresult, "");	// SRB2P: empty this string
+	// so that lua can retrieve it. An empty string would be a failure
+
 	if (con_state == MSCS_WAITING)
 	{
 		CONS_Alert(CONS_NOTICE, M_GetText("Not yet connected to the Master Server.\n"));

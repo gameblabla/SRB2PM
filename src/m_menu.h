@@ -410,6 +410,9 @@ extern INT16 startmap;
 extern INT32 ultimate_selectable;
 extern INT16 char_on, startchar;
 
+#define LISTSERVLEN 4000
+extern char listservresult[LISTSERVLEN];	// SRB2P
+
 #define MAXSAVEGAMES 31
 #define NOSAVESLOT 0 //slot where Play Without Saving appears
 

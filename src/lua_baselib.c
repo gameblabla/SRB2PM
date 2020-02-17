@@ -2973,6 +2973,25 @@ static int lib_gTicsToMilliseconds(lua_State *L)
 	return 1;
 }
 
+// SRB2P_getListServ()
+/*
+	A horrible, horrible function that should've never existed. But hey guess what it does.
+	Gives lua the result of the "listserv" command.
+*/
+#ifndef NONET
+
+#define MAXSERVLEN 4000
+
+static int lib_srb2pgetListServ(lua_State *L)
+{
+	COM_ImmedExecute("listserv");	// execute listserv, otherwise we can't update our string.
+	lua_pushstring(L, listservresult);
+	return 1;
+}
+
+#undef MAXSERVLEN
+#endif
+
 static luaL_Reg lib[] = {
 	{"print", lib_print},
 	{"chatprint", lib_chatprint},
@@ -3191,6 +3210,10 @@ static luaL_Reg lib[] = {
 	{"G_TicsToSeconds",lib_gTicsToSeconds},
 	{"G_TicsToCentiseconds",lib_gTicsToCentiseconds},
 	{"G_TicsToMilliseconds",lib_gTicsToMilliseconds},
+
+#ifndef NONET
+	{"SRB2P_getListServ",lib_srb2pgetListServ},	// dear GOD.
+#endif
 
 	{NULL, NULL}
 };

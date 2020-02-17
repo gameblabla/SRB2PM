@@ -176,6 +176,8 @@ static fixed_t char_scroll = 0;
 
 static tic_t keydown = 0;
 
+char listservresult[LISTSERVLEN];// SRB2P
+
 //
 // PROTOTYPES
 //
