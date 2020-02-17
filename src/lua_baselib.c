@@ -2979,18 +2979,24 @@ static int lib_gTicsToMilliseconds(lua_State *L)
 	Gives lua the result of the "listserv" command.
 */
 #ifndef NONET
-
-#define MAXSERVLEN 4000
-
 static int lib_srb2pgetListServ(lua_State *L)
 {
 	COM_ImmedExecute("listserv");	// execute listserv, otherwise we can't update our string.
 	lua_pushstring(L, listservresult);
 	return 1;
 }
-
-#undef MAXSERVLEN
 #endif
+
+// SRB2P_getEvent()
+/*
+	Gives the current data1 of a keydown event. Used for the title screen.
+	This is clientsided and shouldn't be used anywhere else.
+*/
+static int lib_srb2pgetEvent(lua_State *L)
+{
+	lua_pushinteger(L, curevent);
+	return 1;
+}
 
 static luaL_Reg lib[] = {
 	{"print", lib_print},
@@ -3213,6 +3219,7 @@ static luaL_Reg lib[] = {
 
 #ifndef NONET
 	{"SRB2P_getListServ",lib_srb2pgetListServ},	// dear GOD.
+	{"SRB2P_getEvent",lib_srb2pgetEvent},
 #endif
 
 	{NULL, NULL}

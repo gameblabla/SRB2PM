@@ -165,6 +165,7 @@ UINT8 shiftdown = 0; // 0x1 left, 0x2 right
 UINT8 ctrldown = 0; // 0x1 left, 0x2 right
 UINT8 altdown = 0; // 0x1 left, 0x2 right
 boolean capslock = 0;	// gee i wonder what this does.
+INT32 curevent = 0;		// SRB2P: Current event
 
 //
 // D_ProcessEvents
@@ -177,6 +178,12 @@ void D_ProcessEvents(void)
 	for (; eventtail != eventhead; eventtail = (eventtail+1) & (MAXEVENTS-1))
 	{
 		ev = &events[eventtail];
+		
+		// SRB2P:
+		if (ev->type == ev_keydown)
+			curevent = ev->data1;	// Keys are good enough.
+		else
+			curevent = 0;			// Reset it if nothing is pressed
 
 		// Screenshots over everything so that they can be taken anywhere.
 		if (M_ScreenshotResponder(ev))
