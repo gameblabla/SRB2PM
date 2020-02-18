@@ -1965,7 +1965,7 @@ boolean G_Responder(event_t *ev)
 	{
 		if (ev->type == ev_keydown && ev->data1 != 301 && !(gamestate == GS_TITLESCREEN && finalecount < TICRATE))
 		{
-			M_StartControlPanel();
+			//M_StartControlPanel();	SRB2P
 			return true;
 		}
 		return false;

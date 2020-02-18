@@ -3297,19 +3297,19 @@ boolean M_Responder(event_t *ev)
 			case KEY_F4: // Sound Volume
 				if (modeattacking)
 					return true;
-				M_StartControlPanel();
-				M_Options(0);
+				//M_StartControlPanel();
+				//M_Options(0);
 				// Uncomment the below if you want the menu to reset to the top each time like before. M_SetupNextMenu will fix it automatically.
 				//OP_SoundOptionsDef.lastOn = 0;
-				M_SetupNextMenu(&OP_SoundOptionsDef);
+				//M_SetupNextMenu(&OP_SoundOptionsDef);
 				return true;
 
 			case KEY_F5: // Video Mode
 				if (modeattacking)
 					return true;
-				M_StartControlPanel();
-				M_Options(0);
-				M_VideoModeMenu(0);
+				//M_StartControlPanel();
+				//M_Options(0);
+				//M_VideoModeMenu(0);
 				return true;
 
 			case KEY_F6: // Empty
@@ -3318,9 +3318,9 @@ boolean M_Responder(event_t *ev)
 			case KEY_F7: // Options
 				if (modeattacking)
 					return true;
-				M_StartControlPanel();
-				M_Options(0);
-				M_SetupNextMenu(&OP_MainDef);
+				//M_StartControlPanel();
+				//M_Options(0);
+				//M_SetupNextMenu(&OP_MainDef);
 				return true;
 
 			// Screenshots on F8 now handled elsewhere
@@ -3339,8 +3339,8 @@ boolean M_Responder(event_t *ev)
 			case KEY_ESCAPE: // Pop up menu
 				if (chat_on)
 					HU_clearChatChars();
-				else
-					M_StartControlPanel();
+				//else
+				//	M_StartControlPanel();	SRB2P
 				return true;
 		}
 		noFurtherInput = false; // turns out we didn't care
@@ -3572,6 +3572,7 @@ void M_Drawer(void)
 //
 void M_StartControlPanel(void)
 {
+	
 	// time attack HACK
 	if (modeattacking && demoplayback)
 	{

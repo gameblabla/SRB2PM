@@ -2998,6 +2998,17 @@ static int lib_srb2pgetEvent(lua_State *L)
 	return 1;
 }
 
+// SRB2P_startServer()
+/*
+	starts the server. Then you just have to input map.
+*/
+static int lib_srb2pstartServer(lua_State *L)
+{
+	netgame = true;
+	multiplayer = true;
+}	
+
+
 static luaL_Reg lib[] = {
 	{"print", lib_print},
 	{"chatprint", lib_chatprint},
@@ -3219,8 +3230,9 @@ static luaL_Reg lib[] = {
 
 #ifndef NONET
 	{"SRB2P_getListServ",lib_srb2pgetListServ},	// dear GOD.
-	{"SRB2P_getEvent",lib_srb2pgetEvent},
+	{"SRB2P_startServer",lib_srb2pstartServer},	// dear GOD. x2
 #endif
+	{"SRB2P_getEvent",lib_srb2pgetEvent},
 
 	{NULL, NULL}
 };

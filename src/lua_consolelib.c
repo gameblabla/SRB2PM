@@ -483,7 +483,15 @@ static int lib_consPrintf(lua_State *L)
 	return 0;
 }
 
+// SRB2P: COM_ImmedExecute
+static int lib_consImmedExecute(lua_State *L)
+{
+	COM_ImmedExecute(luaL_checkstring(L,1));
+	return 1;
+}
+
 static luaL_Reg lib[] = {
+	{"COM_ImmedExecute", lib_consImmedExecute},
 	{"COM_AddCommand", lib_comAddCommand},
 	{"COM_BufAddText", lib_comBufAddText},
 	{"COM_BufInsertText", lib_comBufInsertText},
