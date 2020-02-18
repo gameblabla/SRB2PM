@@ -181,7 +181,11 @@ void D_ProcessEvents(void)
 		
 		// SRB2P:
 		if (ev->type == ev_keydown)
+		{	
 			curevent = ev->data1;	// Keys are good enough.
+			if (shiftdown ^ capslock)
+				curevent = shiftxform[ev->data1];	// This will be useful for type fields.
+		}	
 		else
 			curevent = 0;			// Reset it if nothing is pressed
 
