@@ -504,6 +504,7 @@ extern INT32 curevent;	//SRB2P
 
 extern INT32 lua_eventlist[128];	// SRB2P
 extern INT32 lua_eventlength;	//SRB2P
+extern INT32 lua_eatevent;		//SRB2P
 
 // if we ever make our alloc stuff...
 #define ZZ_Alloc(x) Z_Malloc(x, PU_STATIC, NULL)

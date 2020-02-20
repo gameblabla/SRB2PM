@@ -240,7 +240,8 @@ static int lib_comBufAddText(lua_State *L)
 	player_t *plr;
 	if (n < 2)
 		return luaL_error(L, "COM_BufAddText requires two arguments: player and text.");
-	NOHUD
+	//NOHUD
+	// This is HUD safe.
 	lua_settop(L, 2);
 	plr = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
 	if (!plr)
@@ -257,7 +258,8 @@ static int lib_comBufInsertText(lua_State *L)
 	player_t *plr;
 	if (n < 2)
 		return luaL_error(L, "COM_BufInsertText requires two arguments: player and text.");
-	NOHUD
+	//NOHUD
+	// This is HUD safe, otherwise commands sent while the game was paused would synched out, dummy.
 	lua_settop(L, 2);
 	plr = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
 	if (!plr)

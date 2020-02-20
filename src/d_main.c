@@ -168,6 +168,7 @@ boolean capslock = 0;	// gee i wonder what this does.
 INT32 curevent = 0;		// SRB2P: Current event
 INT32 lua_eventlist[128];
 INT32 lua_eventlength = 0;
+INT32 lua_eatevent = 0;
 
 //
 // D_ProcessEvents
@@ -188,7 +189,21 @@ void D_ProcessEvents(void)
 	{
 		ev = &events[eventtail];
 
-		// SRB2P:
+		// Screenshots over everything so that they can be taken anywhere.
+		if (M_ScreenshotResponder(ev))
+			continue; // ate the event
+
+		if (gameaction == ga_nothing && gamestate == GS_TITLESCREEN)
+		{
+			if (cht_Responder(ev))
+				continue;
+		}
+
+		// console input
+		if (CON_Responder(ev))
+			continue; // ate the event
+
+				// SRB2P:
 		if (ev->type == ev_keydown)
 		{
 			curevent = ev->data1;	// Keys are good enough.
@@ -205,23 +220,9 @@ void D_ProcessEvents(void)
 			lua_eventlength++;
 
 		}
-
-		// Screenshots over everything so that they can be taken anywhere.
-		if (M_ScreenshotResponder(ev))
-			continue; // ate the event
-
-		if (gameaction == ga_nothing && gamestate == GS_TITLESCREEN)
-		{
-			if (cht_Responder(ev))
-				continue;
-		}
-
-		// console input
-		if (CON_Responder(ev))
-			continue; // ate the event
-
+		
 		// Menu input
-		if (M_Responder(ev))
+		if (M_Responder(ev) || lua_eatevent)
 			continue; // menu ate the event
 
 		G_Responder(ev);

@@ -3023,6 +3023,16 @@ static int lib_srb2pgetEventList(lua_State *L)
 		return i;	// variable stack, huh!
 }
 
+// SRB2P_eatEvent(bool)
+/*
+	Stops the events from proceeding to G_Responder. Used for SRB2P menus.
+*/
+static int lib_srb2pEatEvent(lua_State *L)
+{
+	boolean nom = luaL_checkboolean(L, 1);
+	lua_eatevent = (INT32)nom;
+	return 0;
+}
 
 // SRB2P_startServer()
 /*
@@ -3277,6 +3287,7 @@ static luaL_Reg lib[] = {
 #endif
 	{"SRB2P_getEvent",lib_srb2pgetEvent},
 	{"SRB2P_getEventList", lib_srb2pgetEventList},
+	{"SRB2P_eatEvent", lib_srb2pEatEvent},
 	{"SRB2P_getControl",lib_srb2pgetControl},
 
 	{NULL, NULL}
