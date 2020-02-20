@@ -166,6 +166,8 @@ UINT8 ctrldown = 0; // 0x1 left, 0x2 right
 UINT8 altdown = 0; // 0x1 left, 0x2 right
 boolean capslock = 0;	// gee i wonder what this does.
 INT32 curevent = 0;		// SRB2P: Current event
+INT32 lua_eventlist[128];	
+INT32 lua_eventlength = 0;
 
 //
 // D_ProcessEvents
@@ -174,6 +176,13 @@ INT32 curevent = 0;		// SRB2P: Current event
 void D_ProcessEvents(void)
 {
 	event_t *ev;
+	INT32 i = 0;
+	curevent = 0;	// reset this every call.
+	
+	for (; i < lua_eventlength; i++)
+		lua_eventlist[i] = 0;
+	
+	lua_eventlength = 0;	// reset this every call as well.
 
 	for (; eventtail != eventhead; eventtail = (eventtail+1) & (MAXEVENTS-1))
 	{
@@ -192,9 +201,10 @@ void D_ProcessEvents(void)
 			else if (shiftdown && curevent < 0x80)		// don't do this for extended characters.
 				curevent = shiftxform[curevent];
 				
-		}	
-		else
-			curevent = 0;			// Reset it if nothing is pressed
+			lua_eventlist[lua_eventlength] = curevent;
+			lua_eventlength++;	
+				
+		}
 
 		// Screenshots over everything so that they can be taken anywhere.
 		if (M_ScreenshotResponder(ev))

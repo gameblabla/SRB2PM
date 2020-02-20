@@ -29,6 +29,7 @@
 #include "hu_stuff.h"	// HU_AddChatText
 #include "console.h"
 #include "d_netcmd.h" // IsPlayerAdmin
+#include "g_input.h"	//SRB2P
 
 #include "lua_script.h"
 #include "lua_libs.h"
@@ -2987,7 +2988,7 @@ static int lib_srb2pgetListServ(lua_State *L)
 }
 #endif
 
-// SRB2P_getEvent()
+// SRB2P_getEvent()		--OBSOLETE, but still useful for simple stuff in menus
 /*
 	Gives the current data1 of a keydown event. Used for the title screen.
 	This is clientsided and shouldn't be used anywhere else.
@@ -2998,6 +2999,29 @@ static int lib_srb2pgetEvent(lua_State *L)
 	return 1;
 }
 
+// SRB2P_getEventList
+/*
+	Similar to getEvent, but returns a table of events pressed during the frame. Useful for text fields.
+	Optimal way to call it is: "local elist = {SRB2P_getEventList()}"
+*/
+static int lib_srb2pgetEventList(lua_State *L)
+{
+	INT32 i;
+	boolean pushed = false;
+
+	for (i=0; i < lua_eventlength; i++)
+	{
+		pushed = true;
+		lua_pushinteger(L, lua_eventlist[i]);
+	}	
+	
+	if (!pushed)
+		return 0;
+	else
+		return i;	// variable stack, huh!
+}	
+
+
 // SRB2P_startServer()
 /*
 	starts the server. Then you just have to input map.
@@ -3006,6 +3030,23 @@ static int lib_srb2pstartServer(lua_State *L)
 {
 	netgame = true;
 	multiplayer = true;
+	return 0;
+}	
+
+// SRB2P_getCurrentControl()
+/*
+	Pushes the 2 keys set to a gc constant.
+*/
+static int lib_srb2pgetControl(lua_State *L)
+{
+	INT32 gc = (INT32)luaL_checkinteger(L, 1);
+	if (gamecontrol[gc])
+	{
+		lua_pushinteger(L, gamecontrol[gc][0]);
+		lua_pushinteger(L, gamecontrol[gc][1]);	// push both controls, even if the other one isn't set.
+		return 2;	// pushed 2 ints
+	}
+	return 0;	// nothing pushed
 }	
 
 
@@ -3233,6 +3274,8 @@ static luaL_Reg lib[] = {
 	{"SRB2P_startServer",lib_srb2pstartServer},	// dear GOD. x2
 #endif
 	{"SRB2P_getEvent",lib_srb2pgetEvent},
+	{"SRB2P_getEventList", lib_srb2pgetEventList},
+	{"SRB2P_getControl",lib_srb2pgetControl},
 
 	{NULL, NULL}
 };

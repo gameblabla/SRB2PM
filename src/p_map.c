@@ -5051,7 +5051,8 @@ void P_CreatePrecipSecNodeList(precipmobj_t *thing,fixed_t x,fixed_t y)
 void P_MapStart(void)
 {
 	if (tmthing)
-		I_Error("P_MapStart: tmthing set!");
+		P_SetTarget(&tmthing, NULL);	// why should we crash???
+		//I_Error("P_MapStart: tmthing set!");
 }
 
 void P_MapEnd(void)
