@@ -1711,6 +1711,18 @@ void G_BuildTiccmd(ticcmd_t *cmd, INT32 realtics, UINT8 ssplayer)
 		}
 	}
 
+	/* 	Lua: Allow this hook to overwrite ticcmd.
+		We check if we're actually in a level because for some reason this Hook would run in menus and on the titlescreen otherwise.
+		Be aware that within this hook, nothing but this player's cmd can be edited (otherwise we'd run in some pretty bad synching problems since this is clientsided, or something)
+
+		SRB2P uses it to prevent user input when a system menu is opened.
+	*/
+#ifdef HAVE_BLUA
+	if (gamestate == GS_LEVEL)
+		LUAh_PlayerCmd(player, cmd);
+#endif
+
+
 	//Reset away view if a command is given.
 	if (ssplayer == 1 && (cmd->forwardmove || cmd->sidemove || cmd->buttons)
 		&& displayplayer != consoleplayer)

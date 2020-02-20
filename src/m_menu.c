@@ -3572,7 +3572,7 @@ void M_Drawer(void)
 //
 void M_StartControlPanel(void)
 {
-	
+
 	// time attack HACK
 	if (modeattacking && demoplayback)
 	{

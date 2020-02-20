@@ -34,9 +34,11 @@
 #include "lua_script.h"
 #include "lua_libs.h"
 #include "lua_hud.h" // hud_running errors
+#include "lua_hook.h" // hook_cmd_running
 
 #define NOHUD if (hud_running)\
-return luaL_error(L, "HUD rendering code should not call this function!");
+return luaL_error(L, "HUD rendering code should not call this function!"); else if (hook_cmd_running) return luaL_error(L, "CMD Building code should not call this function!");
+// Yes technically cmd hook isn't a hud but whatever, this avoids having 2 defines for virtually the same thing.
 
 boolean luaL_checkboolean(lua_State *L, int narg) {
 	luaL_checktype(L, narg, LUA_TBOOLEAN);
@@ -3013,13 +3015,13 @@ static int lib_srb2pgetEventList(lua_State *L)
 	{
 		pushed = true;
 		lua_pushinteger(L, lua_eventlist[i]);
-	}	
-	
+	}
+
 	if (!pushed)
 		return 0;
 	else
 		return i;	// variable stack, huh!
-}	
+}
 
 
 // SRB2P_startServer()
@@ -3031,7 +3033,7 @@ static int lib_srb2pstartServer(lua_State *L)
 	netgame = true;
 	multiplayer = true;
 	return 0;
-}	
+}
 
 // SRB2P_getCurrentControl()
 /*
@@ -3047,7 +3049,7 @@ static int lib_srb2pgetControl(lua_State *L)
 		return 2;	// pushed 2 ints
 	}
 	return 0;	// nothing pushed
-}	
+}
 
 
 static luaL_Reg lib[] = {
