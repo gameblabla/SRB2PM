@@ -590,6 +590,7 @@ void P_Ticker(boolean run)
 {
 	INT32 i;
 
+
 	// Increment jointime and quittime even if paused
 	for (i = 0; i < MAXPLAYERS; i++)
 		if (playeringame[i])

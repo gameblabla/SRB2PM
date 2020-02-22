@@ -28,6 +28,7 @@
 #include "y_inter.h"
 #include "hu_stuff.h"	// HU_AddChatText
 #include "console.h"
+#include "i_system.h"	// I_ClipboardPaste
 #include "d_netcmd.h" // IsPlayerAdmin
 #include "g_input.h"	//SRB2P
 
@@ -3071,6 +3072,16 @@ static int lib_srb2pkillHUD(lua_State *L)
 	return 0;	// this will set itself back next frame, necessary to use immedexecute to exit levels
 }
 
+// SRB2P_clipboardPaste()
+/*
+	Returns I_ClipboardPaste()
+*/
+static int lib_srb2pclipboardPaste(lua_State *L)
+{
+	lua_pushstring(L, I_ClipboardPaste());
+	return 1;
+}
+
 
 static luaL_Reg lib[] = {
 	{"print", lib_print},
@@ -3299,8 +3310,9 @@ static luaL_Reg lib[] = {
 	{"SRB2P_getEventList", lib_srb2pgetEventList},
 	{"SRB2P_eatEvent", lib_srb2pEatEvent},
 	{"SRB2P_getControl",lib_srb2pgetControl},
-	
+
 	{"SRB2P_killHUD", lib_srb2pkillHUD},
+	{"SRB2P_clipboardPaste", lib_srb2pclipboardPaste},
 
 	{NULL, NULL}
 };

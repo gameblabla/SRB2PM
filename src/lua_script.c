@@ -24,6 +24,7 @@
 #include "byteptr.h"
 #include "p_saveg.h"
 #include "p_local.h"
+#include "hu_stuff.h"	// chat_on
 #ifdef ESLOPE
 #include "p_slopes.h" // for P_SlopeById
 #endif
@@ -268,6 +269,15 @@ int LUA_PushGlobals(lua_State *L, const char *word)
 			return 0;
 		LUA_PushUserdata(L, &players[secondarydisplayplayer], META_PLAYER);
 		return 1;
+
+	// SRB2P local vars:
+	} else if (fastcmp(word,"ctrldown")) {
+		lua_pushboolean(L, ctrldown);
+		return 1;
+	} else if (fastcmp(word,"chat_on")) {
+		lua_pushboolean(L, chat_on);
+		return 1;
+
 	// end local player variables
 	} else if (fastcmp(word,"server")) {
 		if ((!multiplayer || !netgame) && !playeringame[serverplayer])
