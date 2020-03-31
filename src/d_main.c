@@ -166,9 +166,9 @@ UINT8 ctrldown = 0; // 0x1 left, 0x2 right
 UINT8 altdown = 0; // 0x1 left, 0x2 right
 boolean capslock = 0;	// gee i wonder what this does.
 INT32 curevent = 0;		// SRB2P: Current event
-INT32 lua_eventlist[128];
-INT32 lua_eventlength = 0;
-INT32 lua_eatevent = 0;
+INT32 lua_eventlist[128];	// SRB2P: Event list
+INT32 lua_eventlength = 0;	// SRB2P: Length of event list
+INT32 lua_eatevent = 0;		// SRB2P: cancel events
 
 //
 // D_ProcessEvents
@@ -177,13 +177,7 @@ INT32 lua_eatevent = 0;
 void D_ProcessEvents(void)
 {
 	event_t *ev;
-	INT32 i = 0;
 	curevent = 0;	// reset this every call.
-
-	for (; i < lua_eventlength; i++)
-		lua_eventlist[i] = 0;
-
-	lua_eventlength = 0;	// reset this every call as well.
 
 	for (; eventtail != eventhead; eventtail = (eventtail+1) & (MAXEVENTS-1))
 	{
@@ -204,7 +198,7 @@ void D_ProcessEvents(void)
 			continue; // ate the event
 
 				// SRB2P:
-		if (ev->type == ev_keydown)
+		if (ev->type == ev_keydown && lua_eventlength < 128)
 		{
 			curevent = ev->data1;	// Keys are good enough.
 
@@ -215,7 +209,7 @@ void D_ProcessEvents(void)
 			}
 			else if (shiftdown && curevent < 0x80)		// don't do this for extended characters.
 				curevent = shiftxform[curevent];
-
+			
 			lua_eventlist[lua_eventlength] = curevent;
 			lua_eventlength++;
 

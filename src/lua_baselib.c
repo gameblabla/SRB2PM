@@ -3016,13 +3016,31 @@ static int lib_srb2pgetEventList(lua_State *L)
 	{
 		pushed = true;
 		lua_pushinteger(L, lua_eventlist[i]);
+		lua_eventlist[i] = 0;	// clear the event
 	}
 
+	lua_eventlength = 0;	// either way, clear this buffer just in case.
 	if (!pushed)
 		return 0;
 	else
 		return i;	// variable stack, huh!
+	
 }
+
+// SRB2P_clearEvents
+/*
+	Clear events from the list
+*/
+static int lib_srb2pclearEvents(lua_State *L)
+{
+	INT32 i;
+	for (i=0; i < lua_eventlength; i++)
+		lua_eventlist[i] = 0;
+	
+	lua_eventlength = 0;
+	return 0;
+}
+
 
 // SRB2P_eatEvent(bool)
 /*
@@ -3308,6 +3326,7 @@ static luaL_Reg lib[] = {
 #endif
 	{"SRB2P_getEvent",lib_srb2pgetEvent},
 	{"SRB2P_getEventList", lib_srb2pgetEventList},
+	{"SRB2P_clearEvents", lib_srb2pclearEvents},
 	{"SRB2P_eatEvent", lib_srb2pEatEvent},
 	{"SRB2P_getControl",lib_srb2pgetControl},
 

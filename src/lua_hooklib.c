@@ -31,6 +31,7 @@ const char *const hookNames[hook_MAX+1] = {
 	"MapChange",
 	"MapLoad",
 	"PlayerJoin",
+	"PrePreThinkFrameAndPause",
 	"PreThinkFrame",
 	"ThinkFrame",
 	"PostThinkFrame",
@@ -419,6 +420,30 @@ void LUAh_PlayerJoin(int playernum)
 	}
 
 	lua_settop(gL, 0);
+}
+
+// Hook for SRB2P's menus, runs like a ThinkFrame (for consistent framerate) but even if the game is paused.
+// This name is intentionally shit :)
+void LUAh_PrePreThinkFrameAndPause(void)
+{
+	hook_p hookp;
+	if (!gL || !(hooksAvailable[hook_PrePreThinkFrameAndPause/8] & (1<<(hook_PrePreThinkFrameAndPause%8))))
+		return;
+
+	for (hookp = roothook; hookp; hookp = hookp->next)
+	{
+		if (hookp->type != hook_PrePreThinkFrameAndPause)
+			continue;
+
+		lua_pushfstring(gL, FMT_HOOKID, hookp->id);
+		lua_gettable(gL, LUA_REGISTRYINDEX);
+		if (lua_pcall(gL, 0, 0, 0)) {
+			if (!hookp->error || cv_debug & DBG_LUA)
+				CONS_Alert(CONS_WARNING,"%s\n",lua_tostring(gL, -1));
+			lua_pop(gL, 1);
+			hookp->error = true;
+		}
+	}
 }
 
 // Hook for frame (before mobj and player thinkers)

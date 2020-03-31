@@ -590,6 +590,10 @@ void P_Ticker(boolean run)
 {
 	INT32 i;
 
+	#ifdef HAVE_BLUA
+	LUAh_PrePreThinkFrameAndPause();
+	#endif
+	
 
 	// Increment jointime and quittime even if paused
 	for (i = 0; i < MAXPLAYERS; i++)
@@ -768,6 +772,10 @@ void P_PreTicker(INT32 frames)
 	{
 		P_MapStart();
 
+#ifdef HAVE_BLUA
+		LUAh_PrePreThinkFrameAndPause();
+#endif		
+		
 #ifdef HAVE_BLUA
 		LUAh_PreThinkFrame();
 #endif
