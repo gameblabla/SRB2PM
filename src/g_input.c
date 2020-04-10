@@ -686,20 +686,20 @@ void G_DefineDefaultControls(void)
 	gamecontroldefault[gcs_fps][gc_backward   ][0] = 's';
 	gamecontroldefault[gcs_fps][gc_strafeleft ][0] = 'a';
 	gamecontroldefault[gcs_fps][gc_straferight][0] = 'd';
-	gamecontroldefault[gcs_fps][gc_lookup     ][0] = KEY_UPARROW;
-	gamecontroldefault[gcs_fps][gc_lookdown   ][0] = KEY_DOWNARROW;
+	//gamecontroldefault[gcs_fps][gc_lookup     ][0] = KEY_UPARROW;
+	//gamecontroldefault[gcs_fps][gc_lookdown   ][0] = KEY_DOWNARROW;
 	gamecontroldefault[gcs_fps][gc_turnleft   ][0] = KEY_LEFTARROW;
 	gamecontroldefault[gcs_fps][gc_turnright  ][0] = KEY_RIGHTARROW;
 	gamecontroldefault[gcs_fps][gc_centerview ][0] = KEY_END;
 	gamecontroldefault[gcs_fps][gc_jump       ][0] = KEY_SPACE;
-	gamecontroldefault[gcs_fps][gc_use        ][0] = KEY_LSHIFT;
+	gamecontroldefault[gcs_fps][gc_use        ][0] = 'x';
 	gamecontroldefault[gcs_fps][gc_fire       ][0] = KEY_RCTRL;
 	gamecontroldefault[gcs_fps][gc_fire       ][1] = KEY_MOUSE1+0;
 	gamecontroldefault[gcs_fps][gc_firenormal ][0] = 'c';
 
 	// Platform game controls (arrow keys)
-	gamecontroldefault[gcs_platform][gc_forward    ][0] = KEY_UPARROW;
-	gamecontroldefault[gcs_platform][gc_backward   ][0] = KEY_DOWNARROW;
+	gamecontroldefault[gcs_platform][gc_forward    ][0] = 'w';
+	gamecontroldefault[gcs_platform][gc_backward   ][0] = 's';
 	gamecontroldefault[gcs_platform][gc_strafeleft ][0] = 'a';
 	gamecontroldefault[gcs_platform][gc_straferight][0] = 'd';
 	gamecontroldefault[gcs_platform][gc_lookup     ][0] = KEY_PGUP;
@@ -708,10 +708,10 @@ void G_DefineDefaultControls(void)
 	gamecontroldefault[gcs_platform][gc_turnright  ][0] = KEY_RIGHTARROW;
 	gamecontroldefault[gcs_platform][gc_centerview ][0] = KEY_END;
 	gamecontroldefault[gcs_platform][gc_jump       ][0] = KEY_SPACE;
-	gamecontroldefault[gcs_platform][gc_use        ][0] = KEY_LSHIFT;
-	gamecontroldefault[gcs_platform][gc_fire       ][0] = 's';
-	gamecontroldefault[gcs_platform][gc_fire       ][1] = KEY_MOUSE1+0;
-	gamecontroldefault[gcs_platform][gc_firenormal ][0] = 'w';
+	gamecontroldefault[gcs_platform][gc_use        ][0] = 'x';
+	//gamecontroldefault[gcs_platform][gc_fire       ][0] = 's';
+	//gamecontroldefault[gcs_platform][gc_fire       ][1] = KEY_MOUSE1+0;
+	//gamecontroldefault[gcs_platform][gc_firenormal ][0] = 'w';
 
 	for (i = 1; i < num_gamecontrolschemes; i++) // skip gcs_custom (0)
 	{
@@ -727,7 +727,7 @@ void G_DefineDefaultControls(void)
 		gamecontroldefault[i][gc_wepslot8   ][0] = '8';
 		gamecontroldefault[i][gc_wepslot9   ][0] = '9';
 		gamecontroldefault[i][gc_wepslot10  ][0] = '0';
-		gamecontroldefault[i][gc_tossflag   ][0] = '\'';
+		gamecontroldefault[i][gc_tossflag   ][0] = 'c';
 		gamecontroldefault[i][gc_camtoggle  ][0] = 'v';
 		gamecontroldefault[i][gc_camreset   ][0] = 'r';
 		gamecontroldefault[i][gc_talkkey    ][0] = 't';
@@ -740,18 +740,14 @@ void G_DefineDefaultControls(void)
 		gamecontroldefault[i][gc_viewpoint  ][0] = KEY_F12;
 
 		// Gamepad controls -- same for both schemes
-		gamecontroldefault[i][gc_weaponnext ][1] = KEY_JOY1+1; // B
-		gamecontroldefault[i][gc_weaponprev ][1] = KEY_JOY1+2; // X
-		gamecontroldefault[i][gc_tossflag   ][1] = KEY_JOY1+0; // A
-		gamecontroldefault[i][gc_use        ][1] = KEY_JOY1+4; // LB
-		gamecontroldefault[i][gc_camtoggle  ][1] = KEY_HAT1+0; // D-Pad Up
-		gamecontroldefault[i][gc_camreset   ][1] = KEY_JOY1+3; // Y
+		gamecontroldefault[i][gc_weaponnext ][1] = KEY_JOY1+5; // RB
+		gamecontroldefault[i][gc_weaponprev ][1] = KEY_JOY1+4; // LB
+		gamecontroldefault[i][gc_tossflag   ][1] = KEY_JOY1+3; // Y
+		gamecontroldefault[i][gc_use        ][1] = KEY_JOY1+1; // B
+		gamecontroldefault[i][gc_camreset   ][1] = KEY_JOY1+2; // X
 		gamecontroldefault[i][gc_centerview ][1] = KEY_JOY1+9; // Right Stick
-		gamecontroldefault[i][gc_talkkey    ][1] = KEY_HAT1+2; // D-Pad Left
-		gamecontroldefault[i][gc_scores     ][1] = KEY_HAT1+3; // D-Pad Right
-		gamecontroldefault[i][gc_jump       ][1] = KEY_JOY1+5; // RB
+		gamecontroldefault[i][gc_jump   	][1] = KEY_JOY1+0; // A
 		gamecontroldefault[i][gc_pause      ][1] = KEY_JOY1+6; // Back
-		gamecontroldefault[i][gc_screenshot ][1] = KEY_HAT1+1; // D-Pad Down
 		gamecontroldefault[i][gc_systemmenu ][0] = KEY_JOY1+7; // Start
 
 		// Second player controls only have joypad defaults
@@ -764,8 +760,8 @@ void G_DefineDefaultControls(void)
 		gamecontrolbisdefault[i][gc_jump      ][0] = KEY_2JOY1+5; // RB
 		//gamecontrolbisdefault[i][gc_pause     ][0] = KEY_2JOY1+6; // Back
 		//gamecontrolbisdefault[i][gc_systemmenu][0] = KEY_2JOY1+7; // Start
-		gamecontrolbisdefault[i][gc_camtoggle ][0] = KEY_2HAT1+0; // D-Pad Up
-		gamecontrolbisdefault[i][gc_screenshot][0] = KEY_2HAT1+1; // D-Pad Down
+		//gamecontrolbisdefault[i][gc_camtoggle ][0] = KEY_2HAT1+0; // D-Pad Up
+		//gamecontrolbisdefault[i][gc_screenshot][0] = KEY_2HAT1+1; // D-Pad Down
 		//gamecontrolbisdefault[i][gc_talkkey   ][0] = KEY_2HAT1+2; // D-Pad Left
 		//gamecontrolbisdefault[i][gc_scores    ][0] = KEY_2HAT1+3; // D-Pad Right
 	}
