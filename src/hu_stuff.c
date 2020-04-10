@@ -1410,7 +1410,7 @@ static char *CHAT_WordWrap(INT32 x, INT32 w, INT32 option, const char *string)
 
 // 30/7/18: chaty is now the distance at which the lowest point of the chat will be drawn if that makes any sense.
 
-INT16 chatx = 13, chaty = 169; // let's use this as our coordinates
+INT16 chatx = 13, chaty = 65; // let's use this as our coordinates
 
 // chat stuff by VincyTM LOL XD!
 
@@ -1484,7 +1484,7 @@ static void HU_drawMiniChat(void)
 			Z_Free(msg);
 	}
 
-	y = chaty - charheight*(msglines+1);
+	y = 10; //chaty - charheight*(msglines+1);
 
 	/*if (splitscreen)
 	{
@@ -1564,6 +1564,9 @@ static void HU_drawMiniChat(void)
 
 static void HU_drawChatLog(INT32 offset)
 {
+
+	offset = 0;	// SRB2P
+
 	INT32 charwidth = 4, charheight = 6;
 	INT32 boxw = cv_chatwidth.value, boxh = cv_chatheight.value;
 	INT32 x = chatx+2, y, dx = 0, dy = 0;
@@ -1685,7 +1688,7 @@ static void HU_DrawChat(void)
 {
 	INT32 charwidth = 4, charheight = 6;
 	INT32 boxw = cv_chatwidth.value;
-	INT32 t = 0, c = 0, y = chaty - (typelines*charheight);
+	INT32 t = 0, c = 0, y = chaty - charheight;	//SRB2P 	//- (typelines*charheight);
 	UINT32 i = 0, saylen = strlen(w_chat); // You learn new things everyday!
 	INT32 cflag = 0;
 	const char *ntalk = "Say: ", *ttalk = "Team: ";

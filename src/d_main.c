@@ -988,7 +988,7 @@ static void IdentifyVersion(void)
 
 		MUSICTEST("music.dta")
 		MUSICTEST("SRB2P-music.wad")
-		MUSICTEST("SRB2P-sounds.wad")
+		MUSICTEST("SRB2P-sounds.pk3")
 	}
 #endif
 
