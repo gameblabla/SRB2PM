@@ -6034,8 +6034,9 @@ static void M_DrawMessageMenu(void)
 static void M_StopMessage(INT32 choice)
 {
 	(void)choice;
-	if (menuactive)
-		M_SetupNextMenu(MessageDef.prevMenu);
+	M_ClearMenus(false);	// SRB2P
+	//if (menuactive)
+	//	M_SetupNextMenu(MessageDef.prevMenu);
 }
 
 // =========
