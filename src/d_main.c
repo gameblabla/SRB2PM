@@ -986,8 +986,8 @@ static void IdentifyVersion(void)
 				I_Error("File "str" has been modified with non-music/sound lumps"); \
 		}
 
-		MUSICTEST("music.dta")
-		MUSICTEST("SRB2P-music.wad")
+		//MUSICTEST("music.dta")
+		MUSICTEST("SRB2P-music.pk3")
 		MUSICTEST("SRB2P-sounds.pk3")
 	}
 #endif
