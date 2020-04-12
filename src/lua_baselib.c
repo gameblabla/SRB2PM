@@ -3100,6 +3100,41 @@ static int lib_srb2pclipboardPaste(lua_State *L)
 	return 1;
 }
 
+// SRB2P_listMusicDefs: Return all music defs as multiple return values.
+static int lib_srb2plistmusicdefs(lua_State *L)
+{
+	musicdef_t *def;
+	INT32 i = 0;
+	
+	// Now let's dance...
+	for (def = musicdefstart; def; def = def->next)
+	{
+		lua_pushstring(L, def->name);
+		i++;
+	}
+	return i;	// variable stack
+}	
+
+// SRB2P_getMusicDef: Push musicdef title and 
+static int lib_srb2pmusicdef(lua_State *L)
+{
+	musicdef_t *def;
+	
+	const char *lumpn = luaL_checkstring(L, 1);	// retrieve string
+	
+	// Now let's dance...
+	for (def = musicdefstart; def; def = def->next)
+	{
+		if (!strcmp(lumpn, def->name))
+		{	
+			lua_pushstring(L, def->title);
+			lua_pushstring(L, def->authors);
+			return 2;
+		}	
+	}
+	return 0;	// SORRY NOTHING
+}	
+
 
 static luaL_Reg lib[] = {
 	{"print", lib_print},
@@ -3332,7 +3367,10 @@ static luaL_Reg lib[] = {
 
 	{"SRB2P_killHUD", lib_srb2pkillHUD},
 	{"SRB2P_clipboardPaste", lib_srb2pclipboardPaste},
-
+	
+	{"SRB2P_getMusicList", lib_srb2plistmusicdefs},
+	{"SRB2P_getMusicDef", lib_srb2pmusicdef},
+	
 	{NULL, NULL}
 };
 
