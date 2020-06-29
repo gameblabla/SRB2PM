@@ -17,14 +17,33 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
-
+#include "../i_system.h"
+#include "../g_game.h"
+#include "../d_netfil.h"
+#include "../lua_libs.h"
+#include "../byteptr.h"
+#include "../lua_script.h"
+#include "../m_misc.h"
 
 
 #define IO_INPUT	1
 #define IO_OUTPUT	2
 
+#define FILELIMIT (1024 * 1024) // Size limit for reading/writing files
 
-static const char *const fnames[] = {"input", "output"};
+#define FMT_FILECALLBACKID "file_callback_%d"
+
+
+// Allow scripters to write files of these types to SRB2's folder
+static const char *whitelist[] = {
+	".bmp",
+	".cfg",
+	".csv",
+	".dat",
+	".png",
+	".sav2",
+	".txt",
+};
 
 
 static int pushresult (lua_State *L, int i, const char *filename) {
@@ -42,12 +61,6 @@ static int pushresult (lua_State *L, int i, const char *filename) {
     lua_pushinteger(L, en);
     return 3;
   }
-}
-
-
-static void fileerror (lua_State *L, int arg, const char *filename) {
-  lua_pushfstring(L, "%s: %s", filename, strerror(errno));
-  luaL_argerror(L, arg, lua_tostring(L, -1));
 }
 
 
@@ -103,17 +116,6 @@ static int io_noclose (lua_State *L) {
 
 
 /*
-** function to close 'popen' files
-*/
-static int io_pclose (lua_State *L) {
-  FILE **p = tofilep(L);
-  int ok = lua_pclose(L, *p);
-  *p = NULL;
-  return pushresult(L, ok, NULL);
-}
-
-
-/*
 ** function to close regular files
 */
 static int io_fclose (lua_State *L) {
@@ -158,17 +160,191 @@ static int io_tostring (lua_State *L) {
 }
 
 
+// Create directories in the path
+void MakePathDirs(char *path)
+{
+	char *c;
+
+	for (c = path; *c; c++)
+		if (*c == '/' || *c == '\\')
+		{
+			char sep = *c;
+			*c = '\0';
+			I_mkdir(path, 0755);
+			*c = sep;
+		}
+}
+
+
+static int CheckFileName(lua_State *L, const char *filename)
+{
+	int length = strlen(filename);
+	boolean pass = false;
+	size_t i;
+
+	if (strchr(filename, '\\'))
+	{
+		luaL_error(L, "access denied to %s: \\ is not allowed, use / instead", filename);
+		return pushresult(L,0,filename);
+	}
+
+	for (i = 0; i < (sizeof (whitelist) / sizeof(const char *)); i++)
+		if (!stricmp(&filename[length - strlen(whitelist[i])], whitelist[i]))
+		{
+			pass = true;
+			break;
+		}
+	if (strstr(filename, "./")
+		|| strstr(filename, "..") || strchr(filename, ':')
+		|| filename[0] == '/'
+		|| !pass)
+	{
+		luaL_error(L, "access denied to %s", filename);
+		return pushresult(L,0,filename);
+	}
+
+	return 0;
+}
+
 static int io_open (lua_State *L) {
-  const char *filename = luaL_checkstring(L, 1);
-  if (strstr(filename, "../") || strstr(filename, "..\\"))
-  {
-	luaL_error(L,"access denied to %s", filename);
-	return pushresult(L,0,filename);
-  }
-  const char *mode = luaL_optstring(L, 2, "r");
-  FILE **pf = newfile(L);
-  *pf = fopen(filename, mode);
-  return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
+	const char *filename = luaL_checkstring(L, 1);
+	const char *mode = luaL_optstring(L, 2, "r");
+	int checkresult;
+
+	checkresult = CheckFileName(L, filename);
+	if (checkresult)
+		return checkresult;
+
+	luaL_checktype(L, 3, LUA_TFUNCTION);
+
+	if (!(strchr(mode, 'r') || strchr(mode, '+')))
+		luaL_error(L, "open() is only for reading, use openlocal() for writing");
+
+	AddLuaFileTransfer(filename, mode);
+
+	return 0;
+}
+
+
+static int io_openlocal (lua_State *L) {
+	FILE **pf;
+	const char *filename = luaL_checkstring(L, 1);
+	const char *mode = luaL_optstring(L, 2, "r");
+	char *realfilename;
+	luafiletransfer_t *filetransfer;
+	int checkresult;
+
+	checkresult = CheckFileName(L, filename);
+	if (checkresult)
+		return checkresult;
+
+	realfilename = va("%s" PATHSEP "%s", luafiledir, filename);
+
+	if (client && strnicmp(filename, "client/", strlen("client/")))
+		I_Error("Access denied to %s\n"
+		        "Clients can only access files stored in luafiles/client/\n",
+		        filename);
+
+	// Prevent access if the file is being downloaded
+	for (filetransfer = luafiletransfers; filetransfer; filetransfer = filetransfer->next)
+		if (!stricmp(filetransfer->filename, filename))
+			I_Error("Access denied to %s\n"
+			        "Files can't be opened while being downloaded\n",
+			        filename);
+
+	MakePathDirs(realfilename);
+
+	// Open and return the file
+	pf = newfile(L);
+	*pf = fopen(realfilename, mode);
+	return (*pf == NULL) ? pushresult(L, 0, filename) : 1;
+}
+
+
+void Got_LuaFile(UINT8 **cp, INT32 playernum)
+{
+	FILE **pf = NULL;
+	UINT8 success = READUINT8(*cp); // The first (and only) byte indicates whether the file could be opened
+
+	if (playernum != serverplayer)
+	{
+		CONS_Alert(CONS_WARNING, M_GetText("Illegal luafile command received from %s\n"), player_names[playernum]);
+		if (server)
+			SendKick(playernum, KICK_MSG_CON_FAIL);
+		return;
+	}
+
+	if (!luafiletransfers)
+		I_Error("No Lua file transfer\n");
+
+	// Retrieve the callback and push it on the stack
+	lua_pushfstring(gL, FMT_FILECALLBACKID, luafiletransfers->id);
+	lua_gettable(gL, LUA_REGISTRYINDEX);
+
+	// Push the first argument (file handle or nil) on the stack
+	if (success)
+	{
+		char mode[4];
+
+		// Ensure we are opening in binary mode
+		// (if it's a text file, newlines have been converted already)
+		strcpy(mode, luafiletransfers->mode);
+		if (!strchr(mode, 'b'))
+			strcat(mode, "b");
+
+		pf = newfile(gL); // Create and push the file handle
+		*pf = fopen(luafiletransfers->realfilename, mode); // Open the file
+		if (!*pf)
+			I_Error("Can't open file \"%s\"\n", luafiletransfers->realfilename); // The file SHOULD exist
+	}
+	else
+		lua_pushnil(gL);
+
+	// Push the second argument (file name) on the stack
+	lua_pushstring(gL, luafiletransfers->filename);
+
+	// Call the callback
+	LUA_Call(gL, 2);
+
+	if (success)
+	{
+		// Close the file
+		if (*pf)
+		{
+			fclose(*pf);
+			*pf = NULL;
+		}
+
+		if (client)
+			remove(luafiletransfers->realfilename);
+	}
+
+	RemoveLuaFileTransfer();
+
+	if (waitingforluafilecommand)
+	{
+		waitingforluafilecommand = false;
+		CL_PrepareDownloadLuaFile();
+	}
+
+	if (server && luafiletransfers)
+		SV_PrepareSendLuaFile();
+}
+
+
+void StoreLuaFileCallback(INT32 id)
+{
+	lua_pushfstring(gL, FMT_FILECALLBACKID, id);
+	lua_pushvalue(gL, 3); // Parameter 3 is the callback
+	lua_settable(gL, LUA_REGISTRYINDEX); // registry[callbackid] = callback
+}
+
+
+void RemoveLuaFileCallback(INT32 id)
+{
+	lua_pushfstring(gL, FMT_FILECALLBACKID, id);
+	lua_pushnil(gL);
+	lua_settable(gL, LUA_REGISTRYINDEX); // registry[callbackid] = nil
 }
 
 
@@ -176,47 +352,6 @@ static int io_tmpfile (lua_State *L) {
   FILE **pf = newfile(L);
   *pf = tmpfile();
   return (*pf == NULL) ? pushresult(L, 0, NULL) : 1;
-}
-
-
-static FILE *getiofile (lua_State *L, int findex) {
-  FILE *f;
-  lua_rawgeti(L, LUA_ENVIRONINDEX, findex);
-  f = *(FILE **)lua_touserdata(L, -1);
-  if (f == NULL)
-    luaL_error(L, "standard %s file is closed", fnames[findex - 1]);
-  return f;
-}
-
-
-static int g_iofile (lua_State *L, int f, const char *mode) {
-  if (!lua_isnoneornil(L, 1)) {
-    const char *filename = lua_tostring(L, 1);
-    if (filename) {
-      FILE **pf = newfile(L);
-      *pf = fopen(filename, mode);
-      if (*pf == NULL)
-        fileerror(L, 1, filename);
-    }
-    else {
-      tofile(L);  /* check that it's a valid file handle */
-      lua_pushvalue(L, 1);
-    }
-    lua_rawseti(L, LUA_ENVIRONINDEX, f);
-  }
-  /* return current value */
-  lua_rawgeti(L, LUA_ENVIRONINDEX, f);
-  return 1;
-}
-
-
-static int io_input (lua_State *L) {
-  return g_iofile(L, IO_INPUT, "r");
-}
-
-
-static int io_output (lua_State *L) {
-  return g_iofile(L, IO_OUTPUT, "w");
 }
 
 
@@ -234,24 +369,6 @@ static int f_lines (lua_State *L) {
   tofile(L);  /* check that it's a valid file handle */
   aux_lines(L, 1, 0);
   return 1;
-}
-
-
-static int io_lines (lua_State *L) {
-  if (lua_isnoneornil(L, 1)) {  /* no arguments? */
-    /* will iterate over default input */
-    lua_rawgeti(L, LUA_ENVIRONINDEX, IO_INPUT);
-    return f_lines(L);
-  }
-  else {
-    const char *filename = luaL_checkstring(L, 1);
-    FILE **pf = newfile(L);
-    *pf = fopen(filename, "r");
-    if (*pf == NULL)
-      fileerror(L, 1, filename);
-    aux_lines(L, lua_gettop(L), 1);
-    return 1;
-  }
 }
 
 
@@ -367,11 +484,6 @@ static int g_read (lua_State *L, FILE *f, int first) {
 }
 
 
-static int io_read (lua_State *L) {
-  return g_read(L, getiofile(L, IO_INPUT), 1);
-}
-
-
 static int f_read (lua_State *L) {
   return g_read(L, tofile(L), 2);
 }
@@ -411,15 +523,14 @@ static int g_write (lua_State *L, FILE *f, int arg) {
     else {
       size_t l;
       const char *s = luaL_checklstring(L, arg, &l);
+      if (ftell(f) + l > FILELIMIT) {
+          luaL_error(L,"write limit bypassed in file. Changes have been discarded.");
+          break;
+      }
       status = status && (fwrite(s, sizeof(char), l, f) == l);
     }
   }
   return pushresult(L, status, NULL);
-}
-
-
-static int io_write (lua_State *L) {
-  return g_write(L, getiofile(L, IO_OUTPUT), 1);
 }
 
 
@@ -455,12 +566,6 @@ static int f_setvbuf (lua_State *L) {
 }
 
 
-
-static int io_flush (lua_State *L) {
-  return pushresult(L, fflush(getiofile(L, IO_OUTPUT)) == 0, NULL);
-}
-
-
 static int f_flush (lua_State *L) {
   return pushresult(L, fflush(tofile(L)) == 0, NULL);
 }
@@ -468,15 +573,10 @@ static int f_flush (lua_State *L) {
 
 static const luaL_Reg iolib[] = {
   {"close", io_close},
-  {"flush", io_flush},
-  {"input", io_input},
-  {"lines", io_lines},
   {"open", io_open},
-  {"output", io_output},
-  {"read", io_read},
+  {"openlocal", io_openlocal},
   {"tmpfile", io_tmpfile},
   {"type", io_type},
-  {"write", io_write},
   {NULL, NULL}
 };
 
@@ -535,10 +635,6 @@ LUALIB_API int luaopen_io (lua_State *L) {
   createstdfile(L, stdout, IO_OUTPUT, "stdout");
   createstdfile(L, stderr, 0, "stderr");
   lua_pop(L, 1);  /* pop environment for default files */
-  lua_getfield(L, -1, "popen");
-  newfenv(L, io_pclose);  /* create environment for 'popen' */
-  lua_setfenv(L, -2);  /* set fenv for 'popen' */
-  lua_pop(L, 1);  /* pop 'popen' */
   return 1;
 }
 

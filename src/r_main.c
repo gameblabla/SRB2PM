@@ -2,7 +2,7 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 1993-1996 by id Software, Inc.
 // Copyright (C) 1998-2000 by DooM Legacy Team.
-// Copyright (C) 1999-2019 by Sonic Team Junior.
+// Copyright (C) 1999-2020 by Sonic Team Junior.
 //
 // This program is free software distributed under the
 // terms of the GNU General Public License, version 2.
@@ -33,6 +33,8 @@
 #include "z_zone.h"
 #include "m_random.h" // quake camera shake
 #include "r_portal.h"
+#include "r_main.h"
+#include "i_system.h" // I_GetTimeMicros
 
 #ifdef HWRENDER
 #include "hardware/hw_main.h"
@@ -97,6 +99,22 @@ lighttable_t *zlight[LIGHTLEVELS][MAXLIGHTZ];
 // Hack to support extra boom colormaps.
 extracolormap_t *extra_colormaps = NULL;
 
+// Render stats
+int rs_prevframetime = 0;
+int rs_rendercalltime = 0;
+int rs_swaptime = 0;
+
+int rs_bsptime = 0;
+
+int rs_sw_portaltime = 0;
+int rs_sw_planetime = 0;
+int rs_sw_maskedtime = 0;
+
+int rs_numbspcalls = 0;
+int rs_numsprites = 0;
+int rs_numdrawnodes = 0;
+int rs_numpolyobjects = 0;
+
 static CV_PossibleValue_t drawdist_cons_t[] = {
 	{256, "256"},	{512, "512"},	{768, "768"},
 	{1024, "1024"},	{1536, "1536"},	{2048, "2048"},
@@ -146,6 +164,8 @@ consvar_t cv_fov = {"fov", "90", CV_FLOAT|CV_CALL, fov_cons_t, Fov_OnChange, 0, 
 consvar_t cv_homremoval = {"homremoval", "No", CV_SAVE, homremoval_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 consvar_t cv_maxportals = {"maxportals", "2", CV_SAVE, maxportals_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+
+consvar_t cv_renderstats = {"renderstats", "Off", 0, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 void SplitScreen_OnChange(void)
 {
@@ -459,9 +479,7 @@ static void R_InitTextureMapping(void)
 	focallength = FixedDiv(projection,
 		FINETANGENT(FINEANGLES/4+FIELDOFVIEW/2));
 
-#ifdef ESLOPE
 	focallengthf = FIXED_TO_FLOAT(focallength);
-#endif
 
 	for (i = 0; i < FINEANGLES/2; i++)
 	{
@@ -547,6 +565,303 @@ static inline void R_InitLightTables(void)
 	}
 }
 
+//#define WOUGHMP_WOUGHMP // I got a fish-eye lens - I'll make a rap video with a couple of friends
+// it's kinda laggy sometimes
+
+static struct {
+	angle_t rollangle; // pre-shifted by fineshift
+#ifdef WOUGHMP_WOUGHMP
+	fixed_t fisheye;
+#endif
+
+	fixed_t zoomneeded;
+	INT32 *scrmap;
+	INT32 scrmapsize;
+
+	INT32 x1; // clip rendering horizontally for efficiency
+	INT16 ceilingclip[MAXVIDWIDTH], floorclip[MAXVIDWIDTH];
+
+	boolean use;
+} viewmorph = {
+	0,
+#ifdef WOUGHMP_WOUGHMP
+	0,
+#endif
+
+	FRACUNIT,
+	NULL,
+	0,
+
+	0,
+	{}, {},
+
+	false
+};
+
+void R_CheckViewMorph(void)
+{
+	float zoomfactor, rollcos, rollsin;
+	float x1, y1, x2, y2;
+	fixed_t temp;
+	INT32 end, vx, vy, pos, usedpos;
+	INT32 usedx, usedy, halfwidth = vid.width/2, halfheight = vid.height/2;
+#ifdef WOUGHMP_WOUGHMP
+	float fisheyemap[MAXVIDWIDTH/2 + 1];
+#endif
+
+	angle_t rollangle = players[displayplayer].viewrollangle;
+#ifdef WOUGHMP_WOUGHMP
+	fixed_t fisheye = cv_cam2_turnmultiplier.value; // temporary test value
+#endif
+
+	rollangle >>= ANGLETOFINESHIFT;
+	rollangle = ((rollangle+2) & ~3) & FINEMASK; // Limit the distinct number of angles to reduce recalcs from angles changing a lot.
+
+#ifdef WOUGHMP_WOUGHMP
+	fisheye &= ~0x7FF; // Same
+#endif
+
+	if (rollangle == viewmorph.rollangle &&
+#ifdef WOUGHMP_WOUGHMP
+		fisheye == viewmorph.fisheye &&
+#endif
+		viewmorph.scrmapsize == vid.width*vid.height)
+		return; // No change
+
+	viewmorph.rollangle = rollangle;
+#ifdef WOUGHMP_WOUGHMP
+	viewmorph.fisheye = fisheye;
+#endif
+
+	if (viewmorph.rollangle == 0
+#ifdef WOUGHMP_WOUGHMP
+		 && viewmorph.fisheye == 0
+#endif
+	 )
+	{
+		viewmorph.use = false;
+		viewmorph.x1 = 0;
+		if (viewmorph.zoomneeded != FRACUNIT)
+			R_SetViewSize();
+		viewmorph.zoomneeded = FRACUNIT;
+
+		return;
+	}
+
+	if (viewmorph.scrmapsize != vid.width*vid.height)
+	{
+		if (viewmorph.scrmap)
+			free(viewmorph.scrmap);
+		viewmorph.scrmap = malloc(vid.width*vid.height * sizeof(INT32));
+		viewmorph.scrmapsize = vid.width*vid.height;
+	}
+
+	temp = FINECOSINE(rollangle);
+	rollcos = FIXED_TO_FLOAT(temp);
+	temp = FINESINE(rollangle);
+	rollsin = FIXED_TO_FLOAT(temp);
+
+	// Calculate maximum zoom needed
+	x1 = (vid.width*fabsf(rollcos) + vid.height*fabsf(rollsin)) / vid.width;
+	y1 = (vid.height*fabsf(rollcos) + vid.width*fabsf(rollsin)) / vid.height;
+
+#ifdef WOUGHMP_WOUGHMP
+	if (fisheye)
+	{
+		float f = FIXED_TO_FLOAT(fisheye);
+		for (vx = 0; vx <= halfwidth; vx++)
+			fisheyemap[vx] = 1.0f / cos(atan(vx * f / halfwidth));
+
+		f = cos(atan(f));
+		if (f < 1.0f)
+		{
+			x1 /= f;
+			y1 /= f;
+		}
+	}
+#endif
+
+	temp = max(x1, y1)*FRACUNIT;
+	if (temp < FRACUNIT)
+		temp = FRACUNIT;
+	else
+		temp |= 0x3FFF; // Limit how many times the viewport needs to be recalculated
+
+	//CONS_Printf("Setting zoom to %f\n", FIXED_TO_FLOAT(temp));
+
+	if (temp != viewmorph.zoomneeded)
+	{
+		viewmorph.zoomneeded = temp;
+		R_SetViewSize();
+	}
+
+	zoomfactor = FIXED_TO_FLOAT(viewmorph.zoomneeded);
+
+	end = vid.width * vid.height - 1;
+
+	pos = 0;
+
+	// Pre-multiply rollcos and rollsin to use for positional stuff
+	rollcos /= zoomfactor;
+	rollsin /= zoomfactor;
+
+	x1 = -(halfwidth * rollcos - halfheight * rollsin);
+	y1 = -(halfheight * rollcos + halfwidth * rollsin);
+
+#ifdef WOUGHMP_WOUGHMP
+	if (fisheye)
+		viewmorph.x1 = (INT32)(halfwidth - (halfwidth * fabsf(rollcos) + halfheight * fabsf(rollsin)) * fisheyemap[halfwidth]);
+	else
+#endif
+	viewmorph.x1 = (INT32)(halfwidth - (halfwidth * fabsf(rollcos) + halfheight * fabsf(rollsin)));
+	//CONS_Printf("saving %d cols\n", viewmorph.x1);
+
+	// Set ceilingclip and floorclip
+	for (vx = 0; vx < vid.width; vx++)
+	{
+		viewmorph.ceilingclip[vx] = vid.height;
+		viewmorph.floorclip[vx] = -1;
+	}
+	x2 = x1;
+	y2 = y1;
+	for (vx = 0; vx < vid.width; vx++)
+	{
+		INT16 xa, ya, xb, yb;
+		xa = x2+halfwidth;
+		ya = y2+halfheight-1;
+		xb = vid.width-1-xa;
+		yb = vid.height-1-ya;
+
+		viewmorph.ceilingclip[xa] = min(viewmorph.ceilingclip[xa], ya);
+		viewmorph.floorclip[xa] = max(viewmorph.floorclip[xa], ya);
+		viewmorph.ceilingclip[xb] = min(viewmorph.ceilingclip[xb], yb);
+		viewmorph.floorclip[xb] = max(viewmorph.floorclip[xb], yb);
+		x2 += rollcos;
+		y2 += rollsin;
+	}
+	x2 = x1;
+	y2 = y1;
+	for (vy = 0; vy < vid.height; vy++)
+	{
+		INT16 xa, ya, xb, yb;
+		xa = x2+halfwidth;
+		ya = y2+halfheight;
+		xb = vid.width-1-xa;
+		yb = vid.height-1-ya;
+
+		viewmorph.ceilingclip[xa] = min(viewmorph.ceilingclip[xa], ya);
+		viewmorph.floorclip[xa] = max(viewmorph.floorclip[xa], ya);
+		viewmorph.ceilingclip[xb] = min(viewmorph.ceilingclip[xb], yb);
+		viewmorph.floorclip[xb] = max(viewmorph.floorclip[xb], yb);
+		x2 -= rollsin;
+		y2 += rollcos;
+	}
+
+	//CONS_Printf("Top left corner is %f %f\n", x1, y1);
+
+#ifdef WOUGHMP_WOUGHMP
+	if (fisheye)
+	{
+		for (vy = 0; vy < halfheight; vy++)
+		{
+			x2 = x1;
+			y2 = y1;
+			x1 -= rollsin;
+			y1 += rollcos;
+
+			for (vx = 0; vx < vid.width; vx++)
+			{
+				usedx = halfwidth + x2*fisheyemap[(int) floorf(fabsf(y2*zoomfactor))];
+				usedy = halfheight + y2*fisheyemap[(int) floorf(fabsf(x2*zoomfactor))];
+
+				usedpos = usedx + usedy*vid.width;
+
+				viewmorph.scrmap[pos] = usedpos;
+				viewmorph.scrmap[end-pos] = end-usedpos;
+
+				x2 += rollcos;
+				y2 += rollsin;
+				pos++;
+			}
+		}
+	}
+	else
+	{
+#endif
+	x1 += halfwidth;
+	y1 += halfheight;
+
+	for (vy = 0; vy < halfheight; vy++)
+	{
+		x2 = x1;
+		y2 = y1;
+		x1 -= rollsin;
+		y1 += rollcos;
+
+		for (vx = 0; vx < vid.width; vx++)
+		{
+			usedx = x2;
+			usedy = y2;
+
+			usedpos = usedx + usedy*vid.width;
+
+			viewmorph.scrmap[pos] = usedpos;
+			viewmorph.scrmap[end-pos] = end-usedpos;
+
+			x2 += rollcos;
+			y2 += rollsin;
+			pos++;
+		}
+	}
+#ifdef WOUGHMP_WOUGHMP
+	}
+#endif
+
+	viewmorph.use = true;
+}
+
+void R_ApplyViewMorph(void)
+{
+	UINT8 *tmpscr = screens[4];
+	UINT8 *srcscr = screens[0];
+	INT32 p, end = vid.width * vid.height;
+
+	if (!viewmorph.use)
+		return;
+
+	if (cv_debug & DBG_VIEWMORPH)
+	{
+		UINT8 border = 32;
+		UINT8 grid = 160;
+		INT32 ws = vid.width / 4;
+		INT32 hs = vid.width * (vid.height / 4);
+
+		memcpy(tmpscr, srcscr, vid.width*vid.height);
+		for (p = 0; p < vid.width; p++)
+		{
+			tmpscr[viewmorph.scrmap[p]] = border;
+			tmpscr[viewmorph.scrmap[p + hs]] = grid;
+			tmpscr[viewmorph.scrmap[p + hs*2]] = grid;
+			tmpscr[viewmorph.scrmap[p + hs*3]] = grid;
+			tmpscr[viewmorph.scrmap[end - 1 - p]] = border;
+		}
+		for (p = vid.width; p < end; p += vid.width)
+		{
+			tmpscr[viewmorph.scrmap[p]] = border;
+			tmpscr[viewmorph.scrmap[p + ws]] = grid;
+			tmpscr[viewmorph.scrmap[p + ws*2]] = grid;
+			tmpscr[viewmorph.scrmap[p + ws*3]] = grid;
+			tmpscr[viewmorph.scrmap[end - 1 - p]] = border;
+		}
+	}
+	else
+		for (p = 0; p < end; p++)
+			tmpscr[p] = srcscr[viewmorph.scrmap[p]];
+
+	VID_BlitLinearScreen(tmpscr, screens[0],
+			vid.width*vid.bpp, vid.height, vid.width*vid.bpp, vid.width);
+}
+
 
 //
 // R_SetViewSize
@@ -595,7 +910,7 @@ void R_ExecuteSetViewSize(void)
 	centeryfrac = centery<<FRACBITS;
 
 	fov = FixedAngle(cv_fov.value/2) + ANGLE_90;
-	fovtan = FINETANGENT(fov >> ANGLETOFINESHIFT);
+	fovtan = FixedMul(FINETANGENT(fov >> ANGLETOFINESHIFT), viewmorph.zoomneeded);
 	if (splitscreen == 1) // Splitscreen FOV should be adjusted to maintain expected vertical view
 		fovtan = 17*fovtan/10;
 
@@ -604,11 +919,6 @@ void R_ExecuteSetViewSize(void)
 	R_InitViewBuffer(scaledviewwidth, viewheight);
 
 	R_InitTextureMapping();
-
-#ifdef HWRENDER
-	if (rendermode != render_soft)
-		HWR_InitTextureMapping();
-#endif
 
 	// thing clipping
 	for (i = 0; i < viewwidth; i++)
@@ -743,28 +1053,33 @@ subsector_t *R_PointInSubsectorOrNull(fixed_t x, fixed_t y)
 // R_SetupFrame
 //
 
-// WARNING: a should be unsigned but to add with 2048, it isn't!
-#define AIMINGTODY(a) FixedDiv((FINETANGENT((2048+(((INT32)a)>>ANGLETOFINESHIFT)) & FINEMASK)*160)>>FRACBITS, fovtan)
-
 // recalc necessary stuff for mouseaiming
 // slopes are already calculated for the full possible view (which is 4*viewheight).
 // 18/08/18: (No it's actually 16*viewheight, thanks Jimita for finding this out)
 static void R_SetupFreelook(void)
 {
 	INT32 dy = 0;
+
+	// clip it in the case we are looking a hardware 90 degrees full aiming
+	// (lmps, network and use F12...)
+	if (rendermode == render_soft
+#ifdef HWRENDER
+		|| cv_grshearing.value
+#endif
+		)
+	{
+		G_SoftwareClipAimingPitch((INT32 *)&aimingangle);
+	}
+
 	if (rendermode == render_soft)
 	{
-		// clip it in the case we are looking a hardware 90 degrees full aiming
-		// (lmps, network and use F12...)
-		G_SoftwareClipAimingPitch((INT32 *)&aimingangle);
-		dy = AIMINGTODY(aimingangle) * viewwidth/BASEVIDWIDTH;
+		dy = (AIMINGTODY(aimingangle)>>FRACBITS) * viewwidth/BASEVIDWIDTH;
 		yslope = &yslopetab[viewheight*8 - (viewheight/2 + dy)];
 	}
+
 	centery = (viewheight/2) + dy;
 	centeryfrac = centery<<FRACBITS;
 }
-
-#undef AIMINGTODY
 
 void R_SetupFrame(player_t *player)
 {
@@ -1010,6 +1325,38 @@ void R_SkyboxFrame(player_t *player)
 	R_SetupFreelook();
 }
 
+boolean R_ViewpointHasChasecam(player_t *player)
+{
+	boolean chasecam = false;
+
+	if (splitscreen && player == &players[secondarydisplayplayer] && player != &players[consoleplayer])
+		chasecam = (cv_chasecam2.value != 0);
+	else
+		chasecam = (cv_chasecam.value != 0);
+
+	if (player->climbing || (player->powers[pw_carry] == CR_NIGHTSMODE) || player->playerstate == PST_DEAD || gamestate == GS_TITLESCREEN || tutorialmode)
+		chasecam = true; // force chasecam on
+	else if (player->spectator) // no spectator chasecam
+		chasecam = false; // force chasecam off
+
+	return chasecam;
+}
+
+boolean R_IsViewpointThirdPerson(player_t *player, boolean skybox)
+{
+	boolean chasecam = R_ViewpointHasChasecam(player);
+
+	// cut-away view stuff
+	if (player->awayviewtics || skybox)
+		return chasecam;
+	// use outside cam view
+	else if (!player->spectator && chasecam)
+		return true;
+
+	// use the player's eyes view
+	return false;
+}
+
 static void R_PortalFrame(portal_t *portal)
 {
 	viewx = portal->viewx;
@@ -1081,9 +1428,22 @@ void R_RenderPlayerView(player_t *player)
 	validcount++;
 
 	// Clear buffers.
-	R_ClearClipSegs();
-	R_ClearDrawSegs();
 	R_ClearPlanes();
+	if (viewmorph.use)
+	{
+		portalclipstart = viewmorph.x1;
+		portalclipend = viewwidth-viewmorph.x1-1;
+		R_PortalClearClipSegs(portalclipstart, portalclipend);
+		memcpy(ceilingclip, viewmorph.ceilingclip, sizeof(INT16)*vid.width);
+		memcpy(floorclip, viewmorph.floorclip, sizeof(INT16)*vid.width);
+	}
+	else
+	{
+		portalclipstart = 0;
+		portalclipend = viewwidth;
+		R_ClearClipSegs();
+	}
+	R_ClearDrawSegs();
 	R_ClearSprites();
 #ifdef FLOORSPLATS
 	R_ClearVisibleFloorSplats();
@@ -1102,7 +1462,11 @@ void R_RenderPlayerView(player_t *player)
 	mytotal = 0;
 	ProfZeroTimer();
 #endif
+	rs_numbspcalls = rs_numpolyobjects = rs_numdrawnodes = 0;
+	rs_bsptime = I_GetTimeMicros();
 	R_RenderBSPNode((INT32)numnodes - 1);
+	rs_bsptime = I_GetTimeMicros() - rs_bsptime;
+	rs_numsprites = visspritecount;
 #ifdef TIMING
 	RDMSR(0x10, &mycount);
 	mytotal += mycount; // 64bit add
@@ -1120,6 +1484,7 @@ void R_RenderPlayerView(player_t *player)
 		Portal_AddSkyboxPortals();
 
 	// Portal rendering. Hijacks the BSP traversal.
+	rs_sw_portaltime = I_GetTimeMicros();
 	if (portal_base)
 	{
 		portal_t *portal;
@@ -1159,15 +1524,20 @@ void R_RenderPlayerView(player_t *player)
 			Portal_Remove(portal);
 		}
 	}
+	rs_sw_portaltime = I_GetTimeMicros() - rs_sw_portaltime;
 
+	rs_sw_planetime = I_GetTimeMicros();
 	R_DrawPlanes();
 #ifdef FLOORSPLATS
 	R_DrawVisibleFloorSplats();
 #endif
+	rs_sw_planetime = I_GetTimeMicros() - rs_sw_planetime;
 
 	// draw mid texture and sprite
 	// And now 3D floors/sides!
+	rs_sw_maskedtime = I_GetTimeMicros();
 	R_DrawMasked(masks, nummasks);
+	rs_sw_maskedtime = I_GetTimeMicros() - rs_sw_maskedtime;
 
 	free(masks);
 }

@@ -1,7 +1,7 @@
 // SONIC ROBO BLAST 2
 //-----------------------------------------------------------------------------
 // Copyright (C) 2012-2016 by John "JTE" Muniz.
-// Copyright (C) 2012-2019 by Sonic Team Junior.
+// Copyright (C) 2012-2020 by Sonic Team Junior.
 //
 // This program is free software distributed under the
 // terms of the GNU General Public License, version 2.
@@ -11,16 +11,14 @@
 /// \brief basic functions for Lua scripting
 
 #include "doomdef.h"
-#ifdef HAVE_BLUA
 #include "fastcmp.h"
 #include "p_local.h"
 #include "p_setup.h" // So we can have P_SetupLevelSky
-#ifdef ESLOPE
-#include "p_slopes.h" // P_GetZAt
-#endif
+#include "p_slopes.h" // P_GetSlopeZAt
 #include "z_zone.h"
 #include "r_main.h"
-#include "r_things.h"
+#include "r_draw.h"
+#include "r_things.h" // R_Frame2Char etc
 #include "m_random.h"
 #include "s_sound.h"
 #include "g_game.h"
@@ -31,6 +29,7 @@
 #include "i_system.h"	// I_ClipboardPaste
 #include "d_netcmd.h" // IsPlayerAdmin
 #include "g_input.h"	//SRB2P
+#include "m_menu.h" // Player Setup menu color stuff
 
 #include "lua_script.h"
 #include "lua_libs.h"
@@ -150,6 +149,8 @@ static const struct {
 	{META_STATE,        "state_t"},
 	{META_MOBJINFO,     "mobjinfo_t"},
 	{META_SFXINFO,      "sfxinfo_t"},
+	{META_SKINCOLOR,    "skincolor_t"},
+	{META_COLORRAMP,    "skincolor_t.ramp"},
 	{META_SPRITEINFO,   "spriteinfo_t"},
 	{META_PIVOTLIST,    "spriteframepivot_t[]"},
 	{META_FRAMEPIVOT,   "spriteframepivot_t"},
@@ -224,10 +225,16 @@ static const char *GetUserdataUType(lua_State *L)
 //   or players[0].powers -> "player_t.powers"
 static int lib_userdataType(lua_State *L)
 {
+	int type;
 	lua_settop(L, 1); // pop everything except arg 1 (in case somebody decided to add more)
-	luaL_checktype(L, 1, LUA_TUSERDATA);
-	lua_pushstring(L, GetUserdataUType(L));
-	return 1;
+	type = lua_type(L, 1);
+	if (type == LUA_TLIGHTUSERDATA || type == LUA_TUSERDATA)
+	{
+		lua_pushstring(L, GetUserdataUType(L));
+		return 1;
+	}
+	else
+		return luaL_typerror(L, 1, "userdata");
 }
 
 static int lib_isPlayerAdmin(lua_State *L)
@@ -249,6 +256,43 @@ static int lib_reserveLuabanks(lua_State *L)
 		return luaL_error(L, "luabanks[] has already been reserved! Only one savedata-enabled mod at a time may use this feature.");
 	reserved = true;
 	LUA_PushUserdata(L, &luabanks, META_LUABANKS);
+	return 1;
+}
+
+// M_MENU
+//////////////
+
+static int lib_pMoveColorBefore(lua_State *L)
+{
+	UINT16 color = (UINT16)luaL_checkinteger(L, 1);
+	UINT16 targ = (UINT16)luaL_checkinteger(L, 2);
+
+	NOHUD
+	M_MoveColorBefore(color, targ);
+	return 0;
+}
+
+static int lib_pMoveColorAfter(lua_State *L)
+{
+	UINT16 color = (UINT16)luaL_checkinteger(L, 1);
+	UINT16 targ = (UINT16)luaL_checkinteger(L, 2);
+
+	NOHUD
+	M_MoveColorAfter(color, targ);
+	return 0;
+}
+
+static int lib_pGetColorBefore(lua_State *L)
+{
+	UINT16 color = (UINT16)luaL_checkinteger(L, 1);
+	lua_pushinteger(L, M_GetColorBefore(color));
+	return 1;
+}
+
+static int lib_pGetColorAfter(lua_State *L)
+{
+	UINT16 color = (UINT16)luaL_checkinteger(L, 1);
+	lua_pushinteger(L, M_GetColorAfter(color));
 	return 1;
 }
 
@@ -1043,11 +1087,60 @@ static int lib_pSetObjectMomZ(lua_State *L)
 	return 0;
 }
 
+static int lib_pPlayJingle(lua_State *L)
+{
+	player_t *player = NULL;
+	jingletype_t jingletype = luaL_checkinteger(L, 2);
+	//NOHUD
+	//INLEVEL
+	if (!lua_isnone(L, 1) && lua_isuserdata(L, 1))
+	{
+		player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
+		if (!player)
+			return LUA_ErrInvalid(L, "player_t");
+	}
+	if (jingletype >= NUMJINGLES)
+		return luaL_error(L, "jingletype %d out of range (0 - %d)", jingletype, NUMJINGLES-1);
+	P_PlayJingle(player, jingletype);
+	return 0;
+}
+
+static int lib_pPlayJingleMusic(lua_State *L)
+{
+	player_t *player = NULL;
+	const char *musnamearg = luaL_checkstring(L, 2);
+	char musname[7], *p = musname;
+	UINT16 musflags = luaL_optinteger(L, 3, 0);
+	boolean looping = lua_opttrueboolean(L, 4);
+	jingletype_t jingletype = luaL_optinteger(L, 5, JT_OTHER);
+	//NOHUD
+	//INLEVEL
+	if (!lua_isnone(L, 1) && lua_isuserdata(L, 1))
+	{
+		player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
+		if (!player)
+			return LUA_ErrInvalid(L, "player_t");
+	}
+	if (jingletype >= NUMJINGLES)
+		return luaL_error(L, "jingletype %d out of range (0 - %d)", jingletype, NUMJINGLES-1);
+
+	musname[6] = '\0';
+	strncpy(musname, musnamearg, 6);
+
+	while (*p) {
+		*p = tolower(*p);
+		++p;
+	}
+
+	P_PlayJingleMusic(player, musname, musflags, looping, jingletype);
+	return 0;
+}
+
 static int lib_pRestoreMusic(lua_State *L)
 {
 	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	NOHUD
-	INLEVEL
+	//NOHUD
+	//INLEVEL
 	if (!player)
 		return LUA_ErrInvalid(L, "player_t");
 	if (P_IsLocalPlayer(player))
@@ -1677,11 +1770,15 @@ static int lib_pPlayVictorySound(lua_State *L)
 
 static int lib_pPlayLivesJingle(lua_State *L)
 {
-	player_t *player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
-	NOHUD
-	INLEVEL
-	if (!player)
-		return LUA_ErrInvalid(L, "player_t");
+	player_t *player = NULL;
+	//NOHUD
+	//INLEVEL
+	if (!lua_isnone(L, 1) && lua_isuserdata(L, 1))
+	{
+		player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
+		if (!player)
+			return LUA_ErrInvalid(L, "player_t");
+	}
 	P_PlayLivesJingle(player);
 	return 0;
 }
@@ -2126,23 +2223,27 @@ static int lib_evStartCrumble(lua_State *L)
 	return 0;
 }
 
-#ifdef ESLOPE
 // P_SLOPES
 ////////////
 
 static int lib_pGetZAt(lua_State *L)
 {
-	pslope_t *slope = *((pslope_t **)luaL_checkudata(L, 1, META_SLOPE));
 	fixed_t x = luaL_checkfixed(L, 2);
 	fixed_t y = luaL_checkfixed(L, 3);
 	//HUDSAFE
-	if (!slope)
-		return LUA_ErrInvalid(L, "pslope_t");
+	if (lua_isnil(L, 1))
+	{
+		fixed_t z = luaL_checkfixed(L, 4);
+		lua_pushfixed(L, P_GetZAt(NULL, x, y, z));
+	}
+	else
+	{
+		pslope_t *slope = *((pslope_t **)luaL_checkudata(L, 1, META_SLOPE));
+		lua_pushfixed(L, P_GetSlopeZAt(slope, x, y));
+	}
 
-	lua_pushfixed(L, P_GetZAt(slope, x, y));
 	return 1;
 }
-#endif
 
 // R_DEFS
 ////////////
@@ -2317,15 +2418,35 @@ static int lib_rTextureNumForName(lua_State *L)
 	return 1;
 }
 
+// R_DRAW
+////////////
+static int lib_rGetColorByName(lua_State *L)
+{
+	const char* colorname = luaL_checkstring(L, 1);
+	//HUDSAFE
+	lua_pushinteger(L, R_GetColorByName(colorname));
+	return 1;
+}
+
+// Lua exclusive function, returns the name of a color from the SKINCOLOR_ constant.
+// SKINCOLOR_GREEN > "Green" for example
+static int lib_rGetNameByColor(lua_State *L)
+{
+	UINT16 colornum = (UINT16)luaL_checkinteger(L, 1);
+	if (!colornum || colornum >= numskincolors)
+		return luaL_error(L, "skincolor %d out of range (1 - %d).", colornum, numskincolors-1);
+	lua_pushstring(L, skincolors[colornum].name);
+	return 1;
+}
+
 // S_SOUND
 ////////////
-
 static int lib_sStartSound(lua_State *L)
 {
 	const void *origin = NULL;
 	sfxenum_t sound_id = luaL_checkinteger(L, 2);
 	player_t *player = NULL;
-	//NOHUD // kys @whoever did this.
+	//NOHUD
 	if (sound_id >= NUMSFX)
 		return luaL_error(L, "sfx %d out of range (0 - %d)", sound_id, NUMSFX-1);
 	if (!lua_isnil(L, 1))
@@ -2356,7 +2477,7 @@ static int lib_sStartSoundAtVolume(lua_State *L)
 	sfxenum_t sound_id = luaL_checkinteger(L, 2);
 	INT32 volume = (INT32)luaL_checkinteger(L, 3);
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 
 	if (!lua_isnil(L, 1))
 	{
@@ -2380,10 +2501,24 @@ static int lib_sStartSoundAtVolume(lua_State *L)
 static int lib_sStopSound(lua_State *L)
 {
 	void *origin = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	NOHUD
+	//NOHUD
 	if (!origin)
 		return LUA_ErrInvalid(L, "mobj_t");
 	S_StopSound(origin);
+	return 0;
+}
+
+static int lib_sStopSoundByID(lua_State *L)
+{
+	void *origin = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
+	sfxenum_t sound_id = luaL_checkinteger(L, 2);
+	//NOHUD
+	if (!origin)
+		return LUA_ErrInvalid(L, "mobj_t");
+	if (sound_id >= NUMSFX)
+		return luaL_error(L, "sfx %d out of range (0 - %d)", sound_id, NUMSFX-1);
+
+	S_StopSoundByID(origin, sound_id);
 	return 0;
 }
 
@@ -2397,7 +2532,7 @@ static int lib_sChangeMusic(lua_State *L)
 	boolean looping;
 	player_t *player = NULL;
 	UINT16 music_flags = 0;
-	NOHUD
+	//NOHUD
 
 	if (lua_isnumber(L, 1))
 	{
@@ -2426,7 +2561,7 @@ static int lib_sChangeMusic(lua_State *L)
 	boolean looping = (boolean)lua_opttrueboolean(L, 2);
 	player_t *player = NULL;
 	UINT16 music_flags = 0;
-	NOHUD
+	//NOHUD
 
 #endif
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
@@ -2457,7 +2592,7 @@ static int lib_sSpeedMusic(lua_State *L)
 	fixed_t fixedspeed = luaL_checkfixed(L, 1);
 	float speed = FIXED_TO_FLOAT(fixedspeed);
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
 	{
 		player = *((player_t **)luaL_checkudata(L, 2, META_PLAYER));
@@ -2472,7 +2607,7 @@ static int lib_sSpeedMusic(lua_State *L)
 static int lib_sStopMusic(lua_State *L)
 {
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 1) && lua_isuserdata(L, 1))
 	{
 		player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
@@ -2488,7 +2623,7 @@ static int lib_sSetInternalMusicVolume(lua_State *L)
 {
 	UINT32 volume = (UINT32)luaL_checkinteger(L, 1);
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
 	{
 		player = *((player_t **)luaL_checkudata(L, 2, META_PLAYER));
@@ -2508,7 +2643,7 @@ static int lib_sSetInternalMusicVolume(lua_State *L)
 static int lib_sStopFadingMusic(lua_State *L)
 {
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 1) && lua_isuserdata(L, 1))
 	{
 		player = *((player_t **)luaL_checkudata(L, 1, META_PLAYER));
@@ -2531,7 +2666,7 @@ static int lib_sFadeMusic(lua_State *L)
 	UINT32 ms;
 	INT32 source_volume;
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
 	{
 		player = *((player_t **)luaL_checkudata(L, 3, META_PLAYER));
@@ -2559,8 +2694,6 @@ static int lib_sFadeMusic(lua_State *L)
 		ms = (UINT32)luaL_checkinteger(L, 3);
 	}
 
-	NOHUD
-
 	if (!player || P_IsLocalPlayer(player))
 		lua_pushboolean(L, S_FadeMusicFromVolume(target_volume, source_volume, ms));
 	else
@@ -2572,7 +2705,7 @@ static int lib_sFadeOutStopMusic(lua_State *L)
 {
 	UINT32 ms = (UINT32)luaL_checkinteger(L, 1);
 	player_t *player = NULL;
-	NOHUD
+	//NOHUD
 	if (!lua_isnone(L, 2) && lua_isuserdata(L, 2))
 	{
 		player = *((player_t **)luaL_checkudata(L, 2, META_PLAYER));
@@ -2588,10 +2721,29 @@ static int lib_sFadeOutStopMusic(lua_State *L)
 	return 1;
 }
 
+static int lib_sGetMusicLength(lua_State *L)
+{
+	lua_pushinteger(L, S_GetMusicLength());
+	return 1;
+}
+
+static int lib_sGetMusicPosition(lua_State *L)
+{
+	lua_pushinteger(L, S_GetMusicPosition());
+	return 1;
+}
+
+static int lib_sSetMusicPosition(lua_State *L)
+{
+	UINT32 pos = (UINT32)luaL_checkinteger(L, 1);
+	lua_pushboolean(L, S_SetMusicPosition(pos));
+	return 1;
+}
+
 static int lib_sOriginPlaying(lua_State *L)
 {
 	void *origin = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
-	NOHUD
+	//NOHUD
 	INLEVEL
 	if (!origin)
 		return LUA_ErrInvalid(L, "mobj_t");
@@ -2602,7 +2754,7 @@ static int lib_sOriginPlaying(lua_State *L)
 static int lib_sIdPlaying(lua_State *L)
 {
 	sfxenum_t id = luaL_checkinteger(L, 1);
-	NOHUD
+	//NOHUD
 	if (id >= NUMSFX)
 		return luaL_error(L, "sfx %d out of range (0 - %d)", id, NUMSFX-1);
 	lua_pushboolean(L, S_IdPlaying(id));
@@ -2613,7 +2765,7 @@ static int lib_sSoundPlaying(lua_State *L)
 {
 	void *origin = *((mobj_t **)luaL_checkudata(L, 1, META_MOBJ));
 	sfxenum_t id = luaL_checkinteger(L, 2);
-	NOHUD
+	//NOHUD
 	INLEVEL
 	if (!origin)
 		return LUA_ErrInvalid(L, "mobj_t");
@@ -2631,7 +2783,7 @@ static int lib_sStartMusicCaption(lua_State *L)
 	const char *caption = luaL_checkstring(L, 1);
 	UINT16 lifespan = (UINT16)luaL_checkinteger(L, 2);
 	//HUDSAFE
-	INLEVEL
+	//INLEVEL
 
 	if (!lua_isnone(L, 3) && lua_isuserdata(L, 3))
 	{
@@ -2790,12 +2942,47 @@ static int lib_gAddGametype(lua_State *L)
 	return 0;
 }
 
+static int Lcheckmapnumber (lua_State *L, int idx, const char *fun)
+{
+	if (ISINLEVEL)
+		return luaL_optinteger(L, idx, gamemap);
+	else
+	{
+		if (lua_isnoneornil(L, idx))
+		{
+			return luaL_error(L,
+					"%s can only be used without a parameter while in a level.",
+					fun
+			);
+		}
+		else
+			return luaL_checkinteger(L, idx);
+	}
+}
+
 static int lib_gBuildMapName(lua_State *L)
 {
-	INT32 map = luaL_optinteger(L, 1, gamemap);
+	INT32 map = Lcheckmapnumber(L, 1, "G_BuildMapName");
 	//HUDSAFE
-	INLEVEL
 	lua_pushstring(L, G_BuildMapName(map));
+	return 1;
+}
+
+static int lib_gBuildMapTitle(lua_State *L)
+{
+	INT32 map = Lcheckmapnumber(L, 1, "G_BuildMapTitle");
+	char *name;
+	if (map < 1 || map > NUMMAPS)
+	{
+		return luaL_error(L,
+				"map number %d out of range (1 - %d)",
+				map,
+				NUMMAPS
+		);
+	}
+	name = G_BuildMapTitle(map);
+	lua_pushstring(L, name);
+	Z_Free(name);
 	return 1;
 }
 
@@ -2920,6 +3107,14 @@ static int lib_gPlatformGametype(lua_State *L)
 	return 1;
 }
 
+static int lib_gCoopGametype(lua_State *L)
+{
+	//HUDSAFE
+	INLEVEL
+	lua_pushboolean(L, G_CoopGametype());
+	return 1;
+}
+
 static int lib_gTagGametype(lua_State *L)
 {
 	//HUDSAFE
@@ -3024,7 +3219,7 @@ static int lib_srb2pgetEventList(lua_State *L)
 		return 0;
 	else
 		return i;	// variable stack, huh!
-	
+
 }
 
 // SRB2P_clearEvents
@@ -3036,7 +3231,7 @@ static int lib_srb2pclearEvents(lua_State *L)
 	INT32 i;
 	for (i=0; i < lua_eventlength; i++)
 		lua_eventlist[i] = 0;
-	
+
 	lua_eventlength = 0;
 	return 0;
 }
@@ -3105,7 +3300,7 @@ static int lib_srb2plistmusicdefs(lua_State *L)
 {
 	musicdef_t *def;
 	INT32 i = 0;
-	
+
 	// Now let's dance...
 	for (def = musicdefstart; def; def = def->next)
 	{
@@ -3113,27 +3308,27 @@ static int lib_srb2plistmusicdefs(lua_State *L)
 		i++;
 	}
 	return i;	// variable stack
-}	
+}
 
-// SRB2P_getMusicDef: Push musicdef title and 
+// SRB2P_getMusicDef: Push musicdef title and
 static int lib_srb2pmusicdef(lua_State *L)
 {
 	musicdef_t *def;
-	
+
 	const char *lumpn = luaL_checkstring(L, 1);	// retrieve string
-	
+
 	// Now let's dance...
 	for (def = musicdefstart; def; def = def->next)
 	{
 		if (!strcmp(lumpn, def->name))
-		{	
+		{
 			lua_pushstring(L, def->title);
 			lua_pushstring(L, def->authors);
 			return 2;
-		}	
+		}
 	}
 	return 0;	// SORRY NOTHING
-}	
+}
 
 
 static luaL_Reg lib[] = {
@@ -3143,6 +3338,12 @@ static luaL_Reg lib[] = {
 	{"userdataType", lib_userdataType},
 	{"IsPlayerAdmin", lib_isPlayerAdmin},
 	{"reserveLuabanks", lib_reserveLuabanks},
+
+	// m_menu
+	{"M_MoveColorAfter",lib_pMoveColorAfter},
+	{"M_MoveColorBefore",lib_pMoveColorBefore},
+	{"M_GetColorAfter",lib_pGetColorAfter},
+	{"M_GetColorBefore",lib_pGetColorBefore},
 
 	// m_random
 	{"P_RandomFixed",lib_pRandomFixed},
@@ -3211,6 +3412,8 @@ static luaL_Reg lib[] = {
 	{"P_InSpaceSector",lib_pInSpaceSector},
 	{"P_InQuicksand",lib_pInQuicksand},
 	{"P_SetObjectMomZ",lib_pSetObjectMomZ},
+	{"P_PlayJingle",lib_pPlayJingle},
+	{"P_PlayJingleMusic",lib_pPlayJingleMusic},
 	{"P_RestoreMusic",lib_pRestoreMusic},
 	{"P_SpawnShieldOrb",lib_pSpawnShieldOrb},
 	{"P_SpawnGhostMobj",lib_pSpawnGhostMobj},
@@ -3293,10 +3496,8 @@ static luaL_Reg lib[] = {
 	{"EV_CrumbleChain",lib_evCrumbleChain},
 	{"EV_StartCrumble",lib_evStartCrumble},
 
-#ifdef ESLOPE
 	// p_slopes
 	{"P_GetZAt",lib_pGetZAt},
-#endif
 
 	// r_defs
 	{"R_PointToAngle",lib_rPointToAngle},
@@ -3316,10 +3517,15 @@ static luaL_Reg lib[] = {
 	{"R_CheckTextureNumForName",lib_rCheckTextureNumForName},
 	{"R_TextureNumForName",lib_rTextureNumForName},
 
+	// r_draw
+	{"R_GetColorByName", lib_rGetColorByName},
+	{"R_GetNameByColor", lib_rGetNameByColor},
+
 	// s_sound
 	{"S_StartSound",lib_sStartSound},
 	{"S_StartSoundAtVolume",lib_sStartSoundAtVolume},
 	{"S_StopSound",lib_sStopSound},
+	{"S_StopSoundByID",lib_sStopSoundByID},
 	{"S_ChangeMusic",lib_sChangeMusic},
 	{"S_SpeedMusic",lib_sSpeedMusic},
 	{"S_StopMusic",lib_sStopMusic},
@@ -3327,6 +3533,9 @@ static luaL_Reg lib[] = {
 	{"S_StopFadingMusic",lib_sStopFadingMusic},
 	{"S_FadeMusic",lib_sFadeMusic},
 	{"S_FadeOutStopMusic",lib_sFadeOutStopMusic},
+	{"S_GetMusicLength",lib_sGetMusicLength},
+	{"S_GetMusicPosition",lib_sGetMusicPosition},
+	{"S_SetMusicPosition",lib_sSetMusicPosition},
 	{"S_OriginPlaying",lib_sOriginPlaying},
 	{"S_IdPlaying",lib_sIdPlaying},
 	{"S_SoundPlaying",lib_sSoundPlaying},
@@ -3335,6 +3544,7 @@ static luaL_Reg lib[] = {
 	// g_game
 	{"G_AddGametype", lib_gAddGametype},
 	{"G_BuildMapName",lib_gBuildMapName},
+	{"G_BuildMapTitle",lib_gBuildMapTitle},
 	{"G_DoReborn",lib_gDoReborn},
 	{"G_SetCustomExitVars",lib_gSetCustomExitVars},
 	{"G_EnoughPlayersFinished",lib_gEnoughPlayersFinished},
@@ -3347,6 +3557,7 @@ static luaL_Reg lib[] = {
 	{"G_GametypeHasSpectators",lib_gGametypeHasSpectators},
 	{"G_RingSlingerGametype",lib_gRingSlingerGametype},
 	{"G_PlatformGametype",lib_gPlatformGametype},
+	{"G_CoopGametype",lib_gCoopGametype},
 	{"G_TagGametype",lib_gTagGametype},
 	{"G_CompetitionGametype",lib_gCompetitionGametype},
 	{"G_TicsToHours",lib_gTicsToHours},
@@ -3367,10 +3578,10 @@ static luaL_Reg lib[] = {
 
 	{"SRB2P_killHUD", lib_srb2pkillHUD},
 	{"SRB2P_clipboardPaste", lib_srb2pclipboardPaste},
-	
+
 	{"SRB2P_getMusicList", lib_srb2plistmusicdefs},
 	{"SRB2P_getMusicDef", lib_srb2pmusicdef},
-	
+
 	{NULL, NULL}
 };
 
@@ -3391,5 +3602,3 @@ int LUA_BaseLib(lua_State *L)
 	luaL_register(L, NULL, lib);
 	return 0;
 }
-
-#endif
