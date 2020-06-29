@@ -587,11 +587,7 @@ static inline void P_DoCTFStuff(void)
 void P_Ticker(boolean run)
 {
 	INT32 i;
-
-	#ifdef HAVE_BLUA
 	LUAh_PrePreThinkFrameAndPause();
-	#endif
-
 
 	// Increment jointime and quittime even if paused
 	for (i = 0; i < MAXPLAYERS; i++)
@@ -760,15 +756,13 @@ void P_PreTicker(INT32 frames)
 
 	postimgtype = postimgtype2 = postimg_none;
 
-	LUAh_PrePreThinkFrameAndPause();
-
 	if (marathonmode & MA_INGAME)
 		marathonmode |= MA_INIT;
-
+	
 	for (framecnt = 0; framecnt < frames; ++framecnt)
 	{
 		P_MapStart();
-
+			LUAh_PrePreThinkFrameAndPause();
 		LUAh_PreThinkFrame();
 
 		for (i = 0; i < MAXPLAYERS; i++)
