@@ -1081,9 +1081,6 @@ static void IdentifyVersion(void)
 	// Graphics (sprites, textures [...])
 	D_AddFile(va(pandf,srb2waddir,"SRB2P-graphics.pk3"));
 
-	// This is a .wad because pk3 hardly saves any space there, and it's more convenient to edit.
-	D_AddFile(va(pandf,srb2waddir,"SRB2P-maps.wad"));
-
 	// Add the players
 	D_AddFile(va(pandf,srb2waddir, "SRB2P-chars.wad"));
 
@@ -1093,6 +1090,11 @@ static void IdentifyVersion(void)
 	// Left in SRB2P for ease.
 	D_AddFile(va(pandf,srb2waddir,"patch.pk3"));
 #endif
+
+	// This is a .wad because pk3 hardly saves any space there, and it's more convenient to edit.
+	// Loaded after patch.pk3 because someone had the bright idea to put maps in there. bruh.
+	
+	D_AddFile(va(pandf,srb2waddir,"SRB2P-maps.wad"));
 
 #if !defined (HAVE_SDL) || defined (HAVE_MIXER)
 	{
