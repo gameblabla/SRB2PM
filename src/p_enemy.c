@@ -3040,11 +3040,11 @@ void A_Boss1Laser(mobj_t *actor)
 				z = actor->z + FixedMul(56*FRACUNIT, actor->scale);
 			break;
 		case 2:
-			var2 = 3; // Fire middle laser
+			var1 = locvar1; var2 = 3; // Fire middle laser
 			A_Boss1Laser(actor);
-			var2 = 0; // Fire left laser
+			var1 = locvar1; var2 = 0; // Fire left laser
 			A_Boss1Laser(actor);
-			var2 = 1; // Fire right laser
+			var1 = locvar1; var2 = 1; // Fire right laser
 			A_Boss1Laser(actor);
 			return;
 			break;
@@ -3858,7 +3858,7 @@ void A_Explode(mobj_t *actor)
 	if (LUA_CallAction("A_Explode", actor))
 		return;
 
-	P_RadiusAttack(actor, actor->target, actor->info->damage, locvar1);
+	P_RadiusAttack(actor, actor->target, actor->info->damage, locvar1, true);
 }
 
 // Function: A_BossDeath
@@ -5214,7 +5214,7 @@ void A_SignPlayer(mobj_t *actor)
 
 	actor->tracer->color = signcolor;
 	if (signcolor && signcolor < numskincolors)
-		signframe += (15 - skincolors[facecolor].invshade);
+		signframe += (15 - skincolors[skincolors[signcolor].invcolor].invshade);
 	actor->tracer->frame = signframe;
 }
 
@@ -5639,7 +5639,7 @@ void A_MinusPopup(mobj_t *actor)
 		P_SetObjectMomZ(rock, 3*FRACUNIT, false);
 		P_SetScale(rock, rock->scale/3);
 	}
-	P_RadiusAttack(actor, actor, 2*actor->radius, 0);
+	P_RadiusAttack(actor, actor, 2*actor->radius, 0, true);
 	if (actor->tracer)
 		P_DamageMobj(actor->tracer, actor, actor, 1, 0);
 
@@ -6945,7 +6945,9 @@ void A_RecyclePowers(mobj_t *actor)
 		for (j = 0; j < NUMPOWERS; j++)
 		{
 			if (j == pw_flashing || j == pw_underwater || j == pw_spacetime || j == pw_carry
-			    || j == pw_tailsfly || j == pw_extralife || j == pw_nocontrol || j == pw_super)
+			    || j == pw_tailsfly || j == pw_extralife || j == pw_nocontrol || j == pw_super
+				|| j == pw_pushing || j == pw_justsprung || j == pw_noautobrake || j == pw_justlaunched
+				|| j == pw_ignorelatch)
 				continue;
 			players[recv_pl].powers[j] = powers[send_pl][j];
 		}
@@ -8837,25 +8839,26 @@ void A_Dye(mobj_t *actor)
 	INT32 locvar2 = var2;
 
 	mobj_t *target = ((locvar1 && actor->target) ? actor->target : actor);
-	UINT8 color = (UINT8)locvar2;
+	UINT16 color = (UINT16)locvar2;
 	if (LUA_CallAction("A_Dye", actor))
 		return;
 	if (color >= numskincolors)
 		return;
 
-	if (!color)
-		target->colorized = false;
-	else
-		target->colorized = true;
-
 	// What if it's a player?
 	if (target->player)
-	{
 		target->player->powers[pw_dye] = color;
-		return;
-	}
 
-	target->color = color;
+	if (!color)
+	{
+		target->colorized = false;
+		target->color = target->player ? target->player->skincolor : SKINCOLOR_NONE;
+	}
+	else if (!(target->player))
+	{
+		target->colorized = true;
+		target->color = color;
+	}
 }
 
 // Function: A_MoveRelative
@@ -11032,7 +11035,7 @@ void A_VileAttack(mobj_t *actor)
 						actor->target->x - P_ReturnThrustX(fire, actor->angle, FixedMul(24*FRACUNIT, fire->scale)),
 						actor->target->y - P_ReturnThrustY(fire, actor->angle, FixedMul(24*FRACUNIT, fire->scale)),
 						fire->z);
-		P_RadiusAttack(fire, actor, 70*FRACUNIT, 0);
+		P_RadiusAttack(fire, actor, 70*FRACUNIT, 0, true);
 	}
 	else
 	{
@@ -11077,7 +11080,7 @@ void A_VileAttack(mobj_t *actor)
 							actor->target->x - P_ReturnThrustX(fire, actor->angle, FixedMul(24*FRACUNIT, fire->scale)),
 							actor->target->y - P_ReturnThrustY(fire, actor->angle, FixedMul(24*FRACUNIT, fire->scale)),
 							fire->z);
-			P_RadiusAttack(fire, actor, 70*FRACUNIT, 0);
+			P_RadiusAttack(fire, actor, 70*FRACUNIT, 0, true);
 		}
 	}
 
@@ -12313,7 +12316,7 @@ void A_MineExplode(mobj_t *actor)
 	quake.intensity = 8*FRACUNIT;
 	quake.time = TICRATE/3;
 
-	P_RadiusAttack(actor, actor->tracer, 192*FRACUNIT, DMG_CANHURTSELF);
+	P_RadiusAttack(actor, actor->tracer, 192*FRACUNIT, DMG_CANHURTSELF, true);
 	P_MobjCheckWater(actor);
 
 	{
@@ -13314,7 +13317,7 @@ void A_Boss5BombExplode(mobj_t *actor)
 	actor->flags2 = MF2_EXPLOSION;
 
 	if (actor->target)
-		P_RadiusAttack(actor, actor->target, 7*actor->radius, 0);
+		P_RadiusAttack(actor, actor->target, 7*actor->radius, 0, true);
 
 	P_DustRing(locvar1, 4, actor->x, actor->y, actor->z+actor->height, 2*actor->radius, 0, FRACUNIT, actor->scale);
 	P_DustRing(locvar1, 6, actor->x, actor->y, actor->z+actor->height/2, 3*actor->radius, FRACUNIT, FRACUNIT, actor->scale);
@@ -13337,6 +13340,9 @@ static boolean PIT_DustDevilLaunch(mobj_t *thing)
 	player_t *player = thing->player;
 
 	if (!player)
+		return true;
+
+	if (player->powers[pw_carry] != CR_DUSTDEVIL && (player->powers[pw_ignorelatch] & (1<<15)))
 		return true;
 
 	if (abs(thing->x - dustdevil->x) > dustdevil->radius || abs(thing->y - dustdevil->y) > dustdevil->radius)

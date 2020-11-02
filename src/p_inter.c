@@ -467,10 +467,22 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 
 			if ((P_MobjFlip(toucher)*toucher->momz < 0) && (elementalpierce != 1))
 			{
-				if (elementalpierce == 2)
-					P_DoBubbleBounce(player);
-				else if (!(player->charability2 == CA2_MELEE && player->panim == PA_ABILITY2))
-					toucher->momz = -toucher->momz;
+				if (!(player->charability2 == CA2_MELEE && player->panim == PA_ABILITY2))
+				{
+					fixed_t setmomz = -toucher->momz; // Store this, momz get changed by P_DoJump within P_DoBubbleBounce
+					
+					if (elementalpierce == 2) // Reset bubblewrap, part 1
+						P_DoBubbleBounce(player);
+					toucher->momz = setmomz;
+					if (elementalpierce == 2) // Reset bubblewrap, part 2
+					{
+						boolean underwater = toucher->eflags & MFE_UNDERWATER;
+							
+						if (underwater)
+							toucher->momz /= 2;
+						toucher->momz -= (toucher->momz/(underwater ? 8 : 4)); // Cap the height!
+					}
+				}
 			}
 			if (player->pflags & PF_BOUNCING)
 				P_DoAbilityBounce(player, false);
@@ -1468,7 +1480,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			return;
 
 		case MT_BLACKEGGMAN_GOOPFIRE:
-			if (!player->powers[pw_flashing])
+			if (!player->powers[pw_flashing] && !(player->powers[pw_ignorelatch] & (1<<15)))
 			{
 				toucher->momx = 0;
 				toucher->momy = 0;
@@ -1584,44 +1596,53 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			return;
 		case MT_SMALLGRABCHAIN:
 		case MT_BIGGRABCHAIN:
-			if (P_MobjFlip(toucher)*toucher->momz > 0
-				|| (player->powers[pw_carry]))
-				return;
-
-			if (toucher->z > special->z + special->height/2)
-				return;
-
-			if (toucher->z + toucher->height/2 < special->z)
-				return;
-
-			if (player->powers[pw_flashing])
-				return;
-
-			if (special->movefactor && special->tracer && special->tracer->angle != ANGLE_90 && special->tracer->angle != ANGLE_270)
-			{ // I don't expect you to understand this, Mr Bond...
-				angle_t ang = R_PointToAngle2(special->x, special->y, toucher->x, toucher->y) - special->tracer->angle;
-				if ((special->movefactor > 0) == (special->tracer->angle > ANGLE_90 && special->tracer->angle < ANGLE_270))
-					ang += ANGLE_180;
-				if (ang < ANGLE_180)
-					return; // I expect you to die.
-			}
-
-			P_ResetPlayer(player);
-			P_SetTarget(&toucher->tracer, special);
-
-			if (special->tracer && !(special->tracer->flags2 & MF2_STRONGBOX))
 			{
-				player->powers[pw_carry] = CR_MACESPIN;
-				S_StartSound(toucher, sfx_spin);
-				P_SetPlayerMobjState(toucher, S_PLAY_ROLL);
+				boolean macespin = false;
+				if (P_MobjFlip(toucher)*toucher->momz > 0
+					|| (player->powers[pw_carry]))
+					return;
+
+				if (toucher->z > special->z + special->height/2)
+					return;
+
+				if (toucher->z + toucher->height/2 < special->z)
+					return;
+
+				if (player->powers[pw_flashing])
+					return;
+
+				if (special->tracer && !(special->tracer->flags2 & MF2_STRONGBOX))
+					macespin = true;
+				
+				if (macespin ? (player->powers[pw_ignorelatch] & (1<<15)) : (player->powers[pw_ignorelatch]))
+					return;
+
+				if (special->movefactor && special->tracer && special->tracer->angle != ANGLE_90 && special->tracer->angle != ANGLE_270)
+				{ // I don't expect you to understand this, Mr Bond...
+					angle_t ang = R_PointToAngle2(special->x, special->y, toucher->x, toucher->y) - special->tracer->angle;
+					if ((special->movefactor > 0) == (special->tracer->angle > ANGLE_90 && special->tracer->angle < ANGLE_270))
+						ang += ANGLE_180;
+					if (ang < ANGLE_180)
+						return; // I expect you to die.
+				}
+
+				P_ResetPlayer(player);
+				P_SetTarget(&toucher->tracer, special);
+
+				if (macespin)
+				{
+					player->powers[pw_carry] = CR_MACESPIN;
+					S_StartSound(toucher, sfx_spin);
+					P_SetPlayerMobjState(toucher, S_PLAY_ROLL);
+				}
+				else
+					player->powers[pw_carry] = CR_GENERIC;
+
+				// Can't jump first frame
+				player->pflags |= PF_JUMPSTASIS;
+
+				return;
 			}
-			else
-				player->powers[pw_carry] = CR_GENERIC;
-
-			// Can't jump first frame
-			player->pflags |= PF_JUMPSTASIS;
-
-			return;
 		case MT_EGGMOBILE2_POGO:
 			// sanity checks
 			if (!special->target || !special->target->health)
@@ -1711,7 +1732,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher, boolean heightcheck)
 			return;
 
 		case MT_MINECARTSPAWNER:
-			if (!player->bot && special->fuse <= TICRATE && player->powers[pw_carry] != CR_MINECART)
+			if (!player->bot && special->fuse <= TICRATE && player->powers[pw_carry] != CR_MINECART && !(player->powers[pw_ignorelatch] & (1<<15)))
 			{
 				mobj_t *mcart = P_SpawnMobj(special->x, special->y, special->z, MT_MINECART);
 				P_SetTarget(&mcart->target, toucher);

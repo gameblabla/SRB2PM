@@ -32,6 +32,7 @@
 #include "sounds.h"
 #include "s_sound.h"
 #include "i_system.h"
+#include "i_threads.h"
 
 // Addfile
 #include "filesrch.h"
@@ -72,12 +73,6 @@
 #if SDL_VERSION_ATLEAST(2,0,0)
 #include "sdl/sdlmain.h" // JOYSTICK_HOTPLUG
 #endif
-#endif
-
-#ifdef PC_DOS
-#include <stdio.h> // for snprintf
-int	snprintf(char *str, size_t n, const char *fmt, ...);
-//int	vsnprintf(char *str, size_t n, const char *fmt, va_list ap);
 #endif
 
 #if defined (__GNUC__) && (__GNUC__ >= 4)
@@ -121,6 +116,12 @@ typedef enum
 	QUIT3MSG6,
 	NUM_QUITMESSAGES
 } text_enum;
+
+#ifdef HAVE_THREADS
+I_mutex m_menu_mutex;
+#endif
+
+M_waiting_mode_t m_waiting_mode = M_NOT_WAITING;
 
 const char *quitmsg[NUM_QUITMESSAGES];
 
@@ -407,9 +408,6 @@ static void M_ResetCvars(void);
 
 // Consvar onchange functions
 static void Newgametype_OnChange(void);
-#ifdef HWRENDER
-static void Newrenderer_OnChange(void);
-#endif
 static void Dummymares_OnChange(void);
 
 // ==========================================================================
@@ -433,11 +431,6 @@ consvar_t cv_chooseskin = {"chooseskin", DEFAULTSKIN, CV_HIDEN|CV_CALL, skins_co
 CV_PossibleValue_t gametype_cons_t[NUMGAMETYPES+1];
 
 consvar_t cv_newgametype = {"newgametype", "Co-op", CV_HIDEN|CV_CALL, gametype_cons_t, Newgametype_OnChange, 0, NULL, NULL, 0, 0, NULL};
-
-#ifdef HWRENDER
-consvar_t cv_newrenderer = {"newrenderer", "Software", CV_HIDEN|CV_CALL, cv_renderer_t, Newrenderer_OnChange, 0, NULL, NULL, 0, 0, NULL};
-static int newrenderer_set = 1;/* Software doesn't need confirmation! */
-#endif
 
 static CV_PossibleValue_t serversort_cons_t[] = {
 	{0,"Ping"},
@@ -489,7 +482,7 @@ CV_PossibleValue_t loadless_cons_t[] = {{0, "Realtime"}, {1, "In-game"}, {0, NUL
 
 consvar_t cv_dummymarathon = {"dummymarathon", "Standard", CV_HIDEN, marathon_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 consvar_t cv_dummycutscenes = {"dummycutscenes", "Off", CV_HIDEN, CV_OnOff, NULL, 0, NULL, NULL, 0, 0, NULL};
-consvar_t cv_dummyloadless = {"dummyloadless", "Realtime", CV_HIDEN, loadless_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
+consvar_t cv_dummyloadless = {"dummyloadless", "In-game", CV_HIDEN, loadless_cons_t, NULL, 0, NULL, NULL, 0, 0, NULL};
 
 // ==========================================================================
 // ORGANIZATION START.
@@ -761,17 +754,18 @@ static menuitem_t SR_EmblemHintMenu[] =
 // Single Player Main
 static menuitem_t SP_MainMenu[] =
 {
+	// Note: If changing the positions here, also change them in M_SinglePlayerMenu()
 	{IT_CALL | IT_STRING,                       NULL, "Start Game",    M_LoadGame,                 76},
 	{IT_SECRET,                                 NULL, "Record Attack", M_TimeAttack,               84},
 	{IT_SECRET,                                 NULL, "NiGHTS Mode",   M_NightsAttack,             92},
-	{IT_CALL | IT_STRING | IT_CALL_NOTMODIFIED, NULL, "Marathon Run",  M_Marathon,                100},
+	{IT_SECRET,                                 NULL, "Marathon Run",  M_Marathon,                100},
 	{IT_CALL | IT_STRING,                       NULL, "Tutorial",      M_StartTutorial,           108},
 	{IT_CALL | IT_STRING | IT_CALL_NOTMODIFIED, NULL, "Statistics",    M_Statistics,              116}
 };
 
 enum
 {
-	sploadgame,
+	spstartgame,
 	sprecordattack,
 	spnightsmode,
 	spmarathon,
@@ -1034,7 +1028,7 @@ enum
 	FIRSTSERVERLINE
 };
 
-static menuitem_t MP_RoomMenu[] =
+menuitem_t MP_RoomMenu[] =
 {
 	{IT_STRING | IT_CALL, NULL, "<Unlisted Mode>", M_ChooseRoom,   9},
 	{IT_DISABLED,         NULL, "",               M_ChooseRoom,  18},
@@ -1117,7 +1111,7 @@ static menuitem_t OP_ChangeControlsMenu[] =
 	{IT_CALL | IT_STRING2, NULL, "Move Left",        M_ChangeControl, gc_strafeleft  },
 	{IT_CALL | IT_STRING2, NULL, "Move Right",       M_ChangeControl, gc_straferight },
 	{IT_CALL | IT_STRING2, NULL, "Jump",             M_ChangeControl, gc_jump      },
-	{IT_CALL | IT_STRING2, NULL, "Spin",             M_ChangeControl, gc_use     },
+	{IT_CALL | IT_STRING2, NULL, "Spin",             M_ChangeControl, gc_spin     },
 	{IT_HEADER, NULL, "Camera", NULL, 0},
 	{IT_SPACE, NULL, NULL, NULL, 0}, // padding
 	{IT_CALL | IT_STRING2, NULL, "Look Up",        M_ChangeControl, gc_lookup      },
@@ -1347,7 +1341,7 @@ static menuitem_t OP_VideoOptionsMenu[] =
 #endif
 	{IT_STRING | IT_CVAR, NULL, "Vertical Sync",                &cv_vidwait,         16},
 #ifdef HWRENDER
-	{IT_STRING | IT_CVAR, NULL, "Renderer",                     &cv_newrenderer,        21},
+	{IT_STRING | IT_CVAR, NULL, "Renderer",                     &cv_renderer,        21},
 #else
 	{IT_TRANSTEXT | IT_PAIR, "Renderer", "Software",            &cv_renderer,           21},
 #endif
@@ -1447,19 +1441,19 @@ static menuitem_t OP_ColorOptionsMenu[] =
 static menuitem_t OP_OpenGLOptionsMenu[] =
 {
 	{IT_HEADER, NULL, "3D Models", NULL, 0},
-	{IT_STRING|IT_CVAR,         NULL, "Models",              &cv_grmodels,             12},
-	{IT_STRING|IT_CVAR,         NULL, "Frame interpolation", &cv_grmodelinterpolation, 22},
-	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_grmodellighting,      32},
+	{IT_STRING|IT_CVAR,         NULL, "Models",              &cv_glmodels,             12},
+	{IT_STRING|IT_CVAR,         NULL, "Frame interpolation", &cv_glmodelinterpolation, 22},
+	{IT_STRING|IT_CVAR,         NULL, "Ambient lighting",    &cv_glmodellighting,      32},
 
 	{IT_HEADER, NULL, "General", NULL, 51},
-	{IT_STRING|IT_CVAR,         NULL, "Shaders",             &cv_grshaders,            63},
-	{IT_STRING|IT_CVAR,         NULL, "Lack of perspective", &cv_grshearing,           73},
+	{IT_STRING|IT_CVAR,         NULL, "Shaders",             &cv_glshaders,            63},
+	{IT_STRING|IT_CVAR,         NULL, "Lack of perspective", &cv_glshearing,           73},
 	{IT_STRING|IT_CVAR,         NULL, "Field of view",       &cv_fov,                  83},
 
 	{IT_HEADER, NULL, "Miscellaneous", NULL, 102},
 	{IT_STRING|IT_CVAR,         NULL, "Bit depth",           &cv_scr_depth,           114},
-	{IT_STRING|IT_CVAR,         NULL, "Texture filter",      &cv_grfiltermode,        124},
-	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",         &cv_granisotropicmode,   134},
+	{IT_STRING|IT_CVAR,         NULL, "Texture filter",      &cv_glfiltermode,        124},
+	{IT_STRING|IT_CVAR,         NULL, "Anisotropic",         &cv_glanisotropicmode,   134},
 #ifdef ALAM_LIGHTING
 	{IT_SUBMENU|IT_STRING,      NULL, "Lighting...",         &OP_OpenGLLightingDef,   144},
 #endif
@@ -1471,10 +1465,10 @@ static menuitem_t OP_OpenGLOptionsMenu[] =
 #ifdef ALAM_LIGHTING
 static menuitem_t OP_OpenGLLightingMenu[] =
 {
-	{IT_STRING|IT_CVAR, NULL, "Coronas",          &cv_grcoronas,          0},
-	{IT_STRING|IT_CVAR, NULL, "Coronas size",     &cv_grcoronasize,      10},
-	{IT_STRING|IT_CVAR, NULL, "Dynamic lighting", &cv_grdynamiclighting, 20},
-	{IT_STRING|IT_CVAR, NULL, "Static lighting",  &cv_grstaticlighting,  30},
+	{IT_STRING|IT_CVAR, NULL, "Coronas",          &cv_glcoronas,          0},
+	{IT_STRING|IT_CVAR, NULL, "Coronas size",     &cv_glcoronasize,      10},
+	{IT_STRING|IT_CVAR, NULL, "Dynamic lighting", &cv_gldynamiclighting, 20},
+	{IT_STRING|IT_CVAR, NULL, "Static lighting",  &cv_glstaticlighting,  30},
 };
 #endif // ALAM_LIGHTING
 
@@ -1483,21 +1477,23 @@ static menuitem_t OP_OpenGLLightingMenu[] =
 static menuitem_t OP_SoundOptionsMenu[] =
 {
 	{IT_HEADER, NULL, "Game Audio", NULL, 0},
-	{IT_STRING | IT_CVAR,  NULL,  "Sound Effects", &cv_gamesounds, 12},
-	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "Sound Volume", &cv_soundvolume, 22},
+	{IT_STRING | IT_CVAR,  NULL,  "Sound Effects", &cv_gamesounds, 6},
+	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "Sound Volume", &cv_soundvolume, 11},
 
-	{IT_STRING | IT_CVAR,  NULL,  "Digital Music", &cv_gamedigimusic, 42},
-	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "Digital Music Volume", &cv_digmusicvolume,  52},
+	{IT_STRING | IT_CVAR,  NULL,  "Digital Music", &cv_gamedigimusic, 21},
+	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "Digital Music Volume", &cv_digmusicvolume,  26},
 
-	{IT_STRING | IT_CVAR,  NULL,  "MIDI Music", &cv_gamemidimusic, 72},
-	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "MIDI Music Volume", &cv_midimusicvolume, 82},
+	{IT_STRING | IT_CVAR,  NULL,  "MIDI Music", &cv_gamemidimusic, 36},
+	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "MIDI Music Volume", &cv_midimusicvolume, 41},
+	
+	{IT_STRING | IT_CVAR,  NULL,  "Music Preference", &cv_musicpref, 51},
 
-	{IT_HEADER, NULL, "Miscellaneous", NULL, 102},
-	{IT_STRING | IT_CVAR, NULL, "Closed Captioning", &cv_closedcaptioning, 114},
-	{IT_STRING | IT_CVAR, NULL, "Reset Music Upon Dying", &cv_resetmusic, 124},
-	{IT_STRING | IT_CVAR, NULL, "Default 1-Up sound", &cv_1upsound, 134},
+	{IT_HEADER, NULL, "Miscellaneous", NULL, 61},
+	{IT_STRING | IT_CVAR, NULL, "Closed Captioning", &cv_closedcaptioning, 67},
+	{IT_STRING | IT_CVAR, NULL, "Reset Music Upon Dying", &cv_resetmusic, 72},
+	{IT_STRING | IT_CVAR, NULL, "Default 1-Up sound", &cv_1upsound, 77},
 
-	{IT_STRING | IT_SUBMENU, NULL, "Advanced Settings...", &OP_SoundAdvancedDef, 154},
+	{IT_STRING | IT_SUBMENU, NULL, "Advanced Settings...", &OP_SoundAdvancedDef, 87},
 };
 
 #ifdef HAVE_OPENMPT
@@ -1661,8 +1657,11 @@ static menuitem_t OP_ServerOptionsMenu[] =
 #ifndef NONET
 	{IT_HEADER, NULL, "Advanced", NULL, 225},
 	{IT_STRING | IT_CVAR | IT_CV_STRING, NULL, "Master server",        &cv_masterserver,       231},
+
 	{IT_STRING | IT_CVAR,    NULL, "Join delay",                       &cv_joindelay,          246},
 	{IT_STRING | IT_CVAR,    NULL, "Attempts to resynchronise",        &cv_resynchattempts,    251},
+
+	{IT_STRING | IT_CVAR,    NULL, "Show IP Address of Joiners",       &cv_showjoinaddress,    256},
 #endif
 };
 
@@ -1943,7 +1942,7 @@ static menu_t SP_NightsGhostDef =
 static menu_t SP_MarathonDef =
 {
 	MTREE2(MN_SP_MAIN, MN_SP_MARATHON),
-	"M_ATTACK", // temporary
+	"M_RATHON",
 	sizeof(SP_MarathonMenu)/sizeof(menuitem_t),
 	&MainDef,  // Doesn't matter.
 	SP_MarathonMenu,
@@ -2196,7 +2195,7 @@ menu_t OP_ColorOptionsDef =
 	0,
 	NULL
 };
-menu_t OP_SoundOptionsDef = DEFAULTMENUSTYLE(
+menu_t OP_SoundOptionsDef = DEFAULTSCROLLMENUSTYLE(
 	MTREE2(MN_OP_MAIN, MN_OP_SOUND),
 	"M_SOUND", OP_SoundOptionsMenu, &OP_MainDef, 30, 30);
 menu_t OP_SoundAdvancedDef = DEFAULTMENUSTYLE(
@@ -2278,6 +2277,9 @@ void Nextmap_OnChange(void)
 {
 	char *leveltitle;
 	char tabase[256];
+#ifdef OLDNREPLAYNAME
+	char tabaseold[256];
+#endif
 	short i;
 	boolean active;
 
@@ -2302,11 +2304,17 @@ void Nextmap_OnChange(void)
 		SP_NightsAttackMenu[naghost].status = IT_DISABLED;
 
 		// Check if file exists, if not, disable REPLAY option
-		sprintf(tabase,"%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s",srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value));
+		sprintf(tabase,"%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s",srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), skins[cv_chooseskin.value-1].name);
+
+#ifdef OLDNREPLAYNAME
+		sprintf(tabaseold,"%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s",srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value));
+#endif
+
 		for (i = 0; i < 4; i++) {
 			SP_NightsReplayMenu[i].status = IT_DISABLED;
 			SP_NightsGuestReplayMenu[i].status = IT_DISABLED;
 		}
+
 		if (FIL_FileExists(va("%s-score-best.lmp", tabase))) {
 			SP_NightsReplayMenu[0].status = IT_WHITESTRING|IT_CALL;
 			SP_NightsGuestReplayMenu[0].status = IT_WHITESTRING|IT_CALL;
@@ -2322,16 +2330,37 @@ void Nextmap_OnChange(void)
 			SP_NightsGuestReplayMenu[2].status = IT_WHITESTRING|IT_CALL;
 			active = true;
 		}
-		if (FIL_FileExists(va("%s-guest.lmp", tabase))) {
+		if (FIL_FileExists(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-guest.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value))))  {
 			SP_NightsReplayMenu[3].status = IT_WHITESTRING|IT_CALL;
 			SP_NightsGuestReplayMenu[3].status = IT_WHITESTRING|IT_CALL;
 			active = true;
 		}
+
+		// Old style name compatibility
+#ifdef OLDNREPLAYNAME
+		if (FIL_FileExists(va("%s-score-best.lmp", tabaseold))) {
+			SP_NightsReplayMenu[0].status = IT_WHITESTRING|IT_CALL;
+			SP_NightsGuestReplayMenu[0].status = IT_WHITESTRING|IT_CALL;
+			active = true;
+		}
+		if (FIL_FileExists(va("%s-time-best.lmp", tabaseold))) {
+			SP_NightsReplayMenu[1].status = IT_WHITESTRING|IT_CALL;
+			SP_NightsGuestReplayMenu[1].status = IT_WHITESTRING|IT_CALL;
+			active = true;
+		}
+		if (FIL_FileExists(va("%s-last.lmp", tabaseold))) {
+			SP_NightsReplayMenu[2].status = IT_WHITESTRING|IT_CALL;
+			SP_NightsGuestReplayMenu[2].status = IT_WHITESTRING|IT_CALL;
+			active = true;
+		}
+#endif
+
 		if (active) {
 			SP_NightsAttackMenu[naguest].status = IT_WHITESTRING|IT_SUBMENU;
 			SP_NightsAttackMenu[nareplay].status = IT_WHITESTRING|IT_SUBMENU;
 			SP_NightsAttackMenu[naghost].status = IT_WHITESTRING|IT_SUBMENU;
 		}
+
 		else if(itemOn == nareplay) // Reset lastOn so replay isn't still selected when not available.
 		{
 			currentMenu->lastOn = itemOn;
@@ -2422,46 +2451,6 @@ static void Newgametype_OnChange(void)
 			CV_SetValue(&cv_nextmap, M_GetFirstLevelInList(cv_newgametype.value));
 	}
 }
-
-#ifdef HWRENDER
-static void Newrenderer_AREYOUSURE(INT32 c)
-{
-	int n;
-	switch (c)
-	{
-		case 'y':
-		case KEY_ENTER:
-			n = cv_newrenderer.value;
-			newrenderer_set |= n;
-			CV_SetValue(&cv_renderer, n);
-			break;
-		default:
-			CV_StealthSetValue(&cv_newrenderer, cv_renderer.value);
-	}
-}
-
-static void Newrenderer_OnChange(void)
-{
-	/* Well this works for now because there's only two options. */
-	int n;
-	n = cv_newrenderer.value;
-	newrenderer_set |= cv_renderer.value;
-	if (( newrenderer_set & n ))
-		CV_SetValue(&cv_renderer, n);
-	else
-	{
-		M_StartMessage(
-				"The OpenGL renderer is incomplete.\n"
-				"Some visuals may fail to appear, or\n"
-				"appear incorrectly.\n"
-				"Do you still want to switch to it?\n"
-				"\n"
-				"(Press 'y' or 'n')",
-				Newrenderer_AREYOUSURE, MM_YESNO
-		);
-	}
-}
-#endif/*HWRENDER*/
 
 void Screenshot_option_Onchange(void)
 {
@@ -3049,7 +3038,6 @@ static void M_GoBack(INT32 choice)
 		//make sure the game doesn't still think we're in a netgame.
 		if (!Playing() && netgame && multiplayer)
 		{
-			MSCloseUDPSocket();		// Clean up so we can re-open the connection later.
 			netgame = multiplayer = false;
 		}
 
@@ -3809,6 +3797,30 @@ void M_SetupNextMenu(menu_t *menudef)
 {
 	INT16 i;
 
+#if defined (MASTERSERVER) && defined (HAVE_THREADS)
+	if (currentMenu == &MP_RoomDef || currentMenu == &MP_ConnectDef)
+	{
+		I_lock_mutex(&ms_QueryId_mutex);
+		{
+			ms_QueryId++;
+		}
+		I_unlock_mutex(ms_QueryId_mutex);
+	}
+
+	if (currentMenu == &MP_ConnectDef)
+	{
+		I_lock_mutex(&ms_ServerList_mutex);
+		{
+			if (ms_ServerList)
+			{
+				free(ms_ServerList);
+				ms_ServerList = NULL;
+			}
+		}
+		I_unlock_mutex(ms_ServerList_mutex);
+	}
+#endif/*HAVE_THREADS*/
+
 	if (currentMenu->quitroutine)
 	{
 		// If you're going from a menu to itself, why are you running the quitroutine? You're not quitting it! -SH
@@ -3872,6 +3884,19 @@ void M_Ticker(void)
 
 	if (currentMenu == &OP_ScreenshotOptionsDef)
 		M_SetupScreenshotMenu();
+
+#if defined (MASTERSERVER) && defined (HAVE_THREADS)
+	I_lock_mutex(&ms_ServerList_mutex);
+	{
+		if (ms_ServerList)
+		{
+			CL_QueryServerList(ms_ServerList);
+			free(ms_ServerList);
+			ms_ServerList = NULL;
+		}
+	}
+	I_unlock_mutex(ms_ServerList_mutex);
+#endif
 }
 
 //
@@ -4407,7 +4432,7 @@ static void M_DrawGenericMenu(void)
 	}
 }
 
-const char *PlaystyleNames[4] = {"Legacy", "Standard", "Simple", "Old Analog??"};
+const char *PlaystyleNames[4] = {"Strafe", "Standard", "Simple", "Old Analog??"};
 const char *PlaystyleDesc[4] = {
 	// Legacy
 	"The play style used for\n"
@@ -7951,7 +7976,7 @@ static void M_SecretsMenu(INT32 choice)
 
 		skyRoomMenuTranslations[i-1] = (UINT8)ul;
 		SR_MainMenu[i].text = unlockables[ul].name;
-		SR_MainMenu[i].alphaKey = (UINT8)unlockables[ul].height;
+		SR_MainMenu[i].alphaKey = (UINT16)unlockables[ul].height;
 
 		if (unlockables[ul].type == SECRET_HEADER)
 		{
@@ -8047,29 +8072,67 @@ static void M_SinglePlayerMenu(INT32 choice)
 {
 	(void)choice;
 
+
+	// Reset the item positions, to avoid them sinking farther down every time the menu is opened if one is unavailable
+	// Note that they're reset, not simply "not moved again", in case mid-game add-ons re-enable an option
+	SP_MainMenu[spstartgame]   .alphaKey = 76;
+	SP_MainMenu[sprecordattack].alphaKey = 84;
+	SP_MainMenu[spnightsmode]  .alphaKey = 92;
+	SP_MainMenu[spmarathon]    .alphaKey = 100;
+	//SP_MainMenu[sptutorial]  .alphaKey = 108; // Not needed
+	//SP_MainMenu[spstatistics].alphaKey = 116; // Not needed
+
+
 	levellistmode = LLM_RECORDATTACK;
 	if (M_GametypeHasLevels(-1))
 		SP_MainMenu[sprecordattack].status = (M_SecretUnlocked(SECRET_RECORDATTACK)) ? IT_CALL|IT_STRING : IT_SECRET;
-	else
-		SP_MainMenu[sprecordattack].status = IT_NOTHING|IT_DISABLED;
+	else // If Record Attack is nonexistent in the current add-on...
+	{
+		SP_MainMenu[sprecordattack].status = IT_NOTHING|IT_DISABLED; // ...hide and disable the Record Attack option...
+		SP_MainMenu[spstartgame].alphaKey += 8; // ...and lower Start Game by 8 pixels to close the gap
+	}
+
 
 	levellistmode = LLM_NIGHTSATTACK;
 	if (M_GametypeHasLevels(-1))
 		SP_MainMenu[spnightsmode].status = (M_SecretUnlocked(SECRET_NIGHTSMODE)) ? IT_CALL|IT_STRING : IT_SECRET;
-	else
-		SP_MainMenu[spnightsmode].status = IT_NOTHING|IT_DISABLED;
+	else // If NiGHTS Mode is nonexistent in the current add-on...
+	{
+		SP_MainMenu[spnightsmode].status = IT_NOTHING|IT_DISABLED; // ...hide and disable the NiGHTS Mode option...
+		// ...and lower the above options' display positions by 8 pixels to close the gap
+		SP_MainMenu[spstartgame]   .alphaKey += 8;
+		SP_MainMenu[sprecordattack].alphaKey += 8;
+	}
 
-	SP_MainMenu[sptutorial].status = tutorialmap ? IT_CALL|IT_STRING : IT_NOTHING|IT_DISABLED;
 
 	// If the FIRST stage immediately leads to the ending, or itself (which gets converted to the title screen in G_DoCompleted for marathonmode only), there's no point in having this option on the menu. You should use Record Attack in that circumstance, although if marathonnext is set this behaviour can be overridden if you make some weird mod that requires multiple playthroughs of the same map in sequence and has some in-level mechanism to break the cycle.
-	if (!M_SecretUnlocked(SECRET_RECORDATTACK) // also if record attack is locked
-		|| (mapheaderinfo[spmarathon_start-1]
+	if (mapheaderinfo[spmarathon_start-1]
 		&& !mapheaderinfo[spmarathon_start-1]->marathonnext
 		&& (mapheaderinfo[spmarathon_start-1]->nextlevel == spmarathon_start
-			|| mapheaderinfo[spmarathon_start-1]->nextlevel >= 1100)))
-		SP_MainMenu[spmarathon].status = IT_NOTHING|IT_DISABLED;
-	else
-		SP_MainMenu[spmarathon].status = IT_CALL|IT_STRING|IT_CALL_NOTMODIFIED;
+			|| mapheaderinfo[spmarathon_start-1]->nextlevel >= 1100))
+	{
+		SP_MainMenu[spmarathon].status = IT_NOTHING|IT_DISABLED; // Hide and disable the Marathon Run option...
+		// ...and lower the above options' display positions by 8 pixels to close the gap
+		SP_MainMenu[spstartgame]   .alphaKey += 8;
+		SP_MainMenu[sprecordattack].alphaKey += 8;
+		SP_MainMenu[spnightsmode]  .alphaKey += 8;
+	}
+	else // Otherwise, if Marathon Run is allowed and Record Attack is unlocked, unlock Marathon Run!
+		SP_MainMenu[spmarathon].status = (M_SecretUnlocked(SECRET_RECORDATTACK)) ? IT_CALL|IT_STRING|IT_CALL_NOTMODIFIED : IT_SECRET;
+
+
+	if (tutorialmap) // If there's a tutorial available in the current add-on...
+		SP_MainMenu[sptutorial].status = IT_CALL | IT_STRING; // ...always unlock Tutorial
+	else // But if there's no tutorial available in the current add-on...
+	{
+		SP_MainMenu[sptutorial].status = IT_NOTHING|IT_DISABLED; // ...hide and disable the Tutorial option...
+		// ...and lower the above options' display positions by 8 pixels to close the gap
+		SP_MainMenu[spstartgame]   .alphaKey += 8;
+		SP_MainMenu[sprecordattack].alphaKey += 8;
+		SP_MainMenu[spnightsmode]  .alphaKey += 8;
+		SP_MainMenu[spmarathon]    .alphaKey += 8;
+	}
+
 
 	M_SetupNextMenu(&SP_MainDef);
 }
@@ -8376,7 +8439,7 @@ static void M_DrawLoadGameData(void)
 				sprdef = &charbotskin->sprites[SPR2_SIGN];
 				if (!sprdef->numframes)
 					goto skipbot;
-				colormap = R_GetTranslationColormap(savegameinfo[savetodraw].botskin, charbotskin->prefcolor, 0);
+				colormap = R_GetTranslationColormap(savegameinfo[savetodraw].botskin-1, charbotskin->prefcolor, 0);
 				sprframe = &sprdef->spriteframes[0];
 				patch = W_CachePatchNum(sprframe->lumppat[0], PU_PATCH);
 
@@ -8898,8 +8961,6 @@ void M_ForceSaveSlotSelected(INT32 sslot)
 // ================
 // CHARACTER SELECT
 // ================
-
-// lactozilla: sometimes the renderer changes and these patches don't exist anymore
 static void M_CacheCharacterSelectEntry(INT32 i, INT32 skinnum)
 {
 	if (!(description[i].picname[0]))
@@ -9142,7 +9203,6 @@ static void M_DrawSetupChoosePlayerMenu(void)
 	INT32 x, y;
 	INT32 w = (vid.width/vid.dupx);
 
-	// lactozilla: the renderer changed so recache patches
 	if (needpatchrecache)
 		M_CacheCharacterSelect();
 
@@ -10130,6 +10190,8 @@ static void M_NightsAttack(INT32 choice)
 // Player has selected the "START" from the nights attack screen
 static void M_ChooseNightsAttack(INT32 choice)
 {
+	char *gpath;
+	const size_t glen = strlen("replay")+1+strlen(timeattackfolder)+1+strlen("MAPXX")+1;
 	char nameofdemo[256];
 	(void)choice;
 	emeralds = 0;
@@ -10140,14 +10202,18 @@ static void M_ChooseNightsAttack(INT32 choice)
 	I_mkdir(va("%s"PATHSEP"replay", srb2home), 0755);
 	I_mkdir(va("%s"PATHSEP"replay"PATHSEP"%s", srb2home, timeattackfolder), 0755);
 
-	snprintf(nameofdemo, sizeof nameofdemo, "replay"PATHSEP"%s"PATHSEP"%s-last", timeattackfolder, G_BuildMapName(cv_nextmap.value));
+	if ((gpath = malloc(glen)) == NULL)
+		I_Error("Out of memory for replay filepath\n");
+
+	sprintf(gpath,"replay"PATHSEP"%s"PATHSEP"%s", timeattackfolder, G_BuildMapName(cv_nextmap.value));
+	snprintf(nameofdemo, sizeof nameofdemo, "%s-%s-last", gpath, skins[cv_chooseskin.value-1].name);
 
 	if (!cv_autorecord.value)
 		remove(va("%s"PATHSEP"%s.lmp", srb2home, nameofdemo));
 	else
 		G_RecordDemo(nameofdemo);
 
-	G_DeferedInitNew(false, G_BuildMapName(cv_nextmap.value), 0, false, false);
+	G_DeferedInitNew(false, G_BuildMapName(cv_nextmap.value), (UINT8)(cv_chooseskin.value-1), false, false);
 }
 
 // Player has selected the "START" from the time attack screen
@@ -10183,6 +10249,7 @@ static void M_ChooseTimeAttack(INT32 choice)
 static void M_ReplayTimeAttack(INT32 choice)
 {
 	const char *which;
+	char *demoname;
 	M_ClearMenus(true);
 	modeattacking = ATTACKING_RECORD; // set modeattacking before G_DoPlayDemo so the map loader knows
 
@@ -10224,11 +10291,18 @@ static void M_ReplayTimeAttack(INT32 choice)
 			which = "last";
 			break;
 		case 3: // guest
-			which = "guest";
-			break;
+			G_DoPlayDemo(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-guest.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value)));
+			return;
 		}
-		// srb2/replay/main/map01-score-best.lmp
-		G_DoPlayDemo(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), which));
+
+		demoname = va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), skins[cv_chooseskin.value-1].name, which);
+
+#ifdef OLDNREPLAYNAME // Check for old style named NiGHTS replay if a new style replay doesn't exist.
+		if (!FIL_FileExists(demoname))
+			demoname = va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), which);
+#endif
+
+		G_DoPlayDemo(demoname);
 	}
 }
 
@@ -10246,15 +10320,13 @@ static void M_EraseGuest(INT32 choice)
 	M_StartMessage(M_GetText("Guest replay data erased.\n"),NULL,MM_NOTHING);
 }
 
-static void M_OverwriteGuest(const char *which, boolean nights)
+static void M_OverwriteGuest(const char *which)
 {
 	char *rguest = Z_StrDup(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-guest.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value)));
 	UINT8 *buf;
 	size_t len;
-	if (!nights)
-		len = FIL_ReadFile(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), skins[cv_chooseskin.value-1].name, which), &buf);
-	else
-		len = FIL_ReadFile(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), which), &buf);
+	len = FIL_ReadFile(va("%s"PATHSEP"replay"PATHSEP"%s"PATHSEP"%s-%s-%s.lmp", srb2home, timeattackfolder, G_BuildMapName(cv_nextmap.value), skins[cv_chooseskin.value-1].name, which), &buf);
+
 	if (!len) {
 		return;
 	}
@@ -10275,25 +10347,25 @@ static void M_OverwriteGuest(const char *which, boolean nights)
 static void M_OverwriteGuest_Time(INT32 choice)
 {
 	(void)choice;
-	M_OverwriteGuest("time-best", currentMenu == &SP_NightsGuestReplayDef);
+	M_OverwriteGuest("time-best");
 }
 
 static void M_OverwriteGuest_Score(INT32 choice)
 {
 	(void)choice;
-	M_OverwriteGuest("score-best", currentMenu == &SP_NightsGuestReplayDef);
+	M_OverwriteGuest("score-best");
 }
 
 static void M_OverwriteGuest_Rings(INT32 choice)
 {
 	(void)choice;
-	M_OverwriteGuest("rings-best", false);
+	M_OverwriteGuest("rings-best");
 }
 
 static void M_OverwriteGuest_Last(INT32 choice)
 {
 	(void)choice;
-	M_OverwriteGuest("last", currentMenu == &SP_NightsGuestReplayDef);
+	M_OverwriteGuest("last");
 }
 
 static void M_SetGuestReplay(INT32 choice)
@@ -10486,8 +10558,7 @@ static void M_StartMarathon(INT32 choice)
 	(void)choice;
 	marathontime = 0;
 	marathonmode = MA_RUNNING|MA_INIT;
-	if (cv_dummymarathon.value == 1)
-		cursaveslot = MARATHONSLOT;
+	cursaveslot = (cv_dummymarathon.value == 1) ? MARATHONSLOT : 0;
 	if (!cv_dummycutscenes.value)
 		marathonmode |= MA_NOCUTSCENES;
 	if (cv_dummyloadless.value)
@@ -10632,7 +10703,7 @@ void M_DrawMarathon(void)
 			recatkdrawtimer -= (10*TICRATE);
 	}
 
-	//M_DrawMenuTitle();
+	M_DrawMenuTitle();
 
 	// draw menu (everything else goes on top of it)
 	// Sadly we can't just use generic mode menus because we need some extra hacks
@@ -10841,22 +10912,65 @@ static INT32 menuRoomIndex = 0;
 
 static void M_DrawRoomMenu(void)
 {
+	static int frame = -12;
+	int dot_frame;
+	char text[4];
+
 	const char *rmotd;
+	const char *waiting_message;
+
+	int dots;
+
+	if (m_waiting_mode)
+	{
+		dot_frame = frame / 4;
+		dots = dot_frame + 3;
+
+		strcpy(text, "   ");
+
+		if (dots > 0)
+		{
+			if (dot_frame < 0)
+				dot_frame = 0;
+
+			strncpy(&text[dot_frame], "...", min(dots, 3 - dot_frame));
+		}
+
+		if (++frame == 12)
+			frame = -12;
+
+		currentMenu->menuitems[0].text = text;
+	}
 
 	// use generic drawer for cursor, items and title
 	M_DrawGenericMenu();
 
 	V_DrawString(currentMenu->x - 16, currentMenu->y, V_YELLOWMAP, M_GetText("Select a room"));
 
-	M_DrawTextBox(144, 24, 20, 20);
+	if (m_waiting_mode == M_NOT_WAITING)
+	{
+		M_DrawTextBox(144, 24, 20, 20);
 
-	if (itemOn == 0)
-		rmotd = M_GetText("Don't connect to the Master Server.");
-	else
-		rmotd = room_list[itemOn-1].motd;
+		if (itemOn == 0)
+			rmotd = M_GetText("Don't connect to the Master Server.");
+		else
+			rmotd = room_list[itemOn-1].motd;
 
-	rmotd = V_WordWrap(0, 20*8, 0, rmotd);
-	V_DrawString(144+8, 32, V_ALLOWLOWERCASE|V_RETURN8, rmotd);
+		rmotd = V_WordWrap(0, 20*8, 0, rmotd);
+		V_DrawString(144+8, 32, V_ALLOWLOWERCASE|V_RETURN8, rmotd);
+	}
+
+	if (m_waiting_mode)
+	{
+		// Display a little "please wait" message.
+		M_DrawTextBox(52, BASEVIDHEIGHT/2-10, 25, 3);
+		if (m_waiting_mode == M_WAITING_VERSION)
+			waiting_message = "Checking for updates...";
+		else
+			waiting_message = "Fetching room info...";
+		V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT/2, 0, waiting_message);
+		V_DrawCenteredString(BASEVIDWIDTH/2, (BASEVIDHEIGHT/2)+12, 0, "Please wait.");
+	}
 }
 
 static void M_DrawConnectMenu(void)
@@ -10924,6 +11038,14 @@ static void M_DrawConnectMenu(void)
 	localservercount = serverlistcount;
 
 	M_DrawGenericMenu();
+
+	if (m_waiting_mode)
+	{
+		// Display a little "please wait" message.
+		M_DrawTextBox(52, BASEVIDHEIGHT/2-10, 25, 3);
+		V_DrawCenteredString(BASEVIDWIDTH/2, BASEVIDHEIGHT/2, 0, "Searching for servers...");
+		V_DrawCenteredString(BASEVIDWIDTH/2, (BASEVIDHEIGHT/2)+12, 0, "Please wait.");
+	}
 }
 
 static boolean M_CancelConnect(void)
@@ -11013,10 +11135,10 @@ void M_SortServerList(void)
 
 #ifndef NONET
 #ifdef UPDATE_ALERT
-static boolean M_CheckMODVersion(void)
+static boolean M_CheckMODVersion(int id)
 {
 	char updatestring[500];
-	const char *updatecheck = GetMODVersion();
+	const char *updatecheck = GetMODVersion(id);
 	if(updatecheck)
 	{
 		sprintf(updatestring, UPDATE_ALERT_STRING, VERSIONSTRING, updatecheck);
@@ -11025,7 +11147,66 @@ static boolean M_CheckMODVersion(void)
 	} else
 		return true;
 }
+#endif/*UPDATE_ALERT*/
+
+#if defined (MASTERSERVER) && defined (HAVE_THREADS)
+static void
+Check_new_version_thread (int *id)
+{
+	int hosting;
+	int okay;
+
+	okay = 0;
+
+#ifdef UPDATE_ALERT
+	if (M_CheckMODVersion(*id))
 #endif
+	{
+		I_lock_mutex(&ms_QueryId_mutex);
+		{
+			okay = ( *id == ms_QueryId );
+		}
+		I_unlock_mutex(ms_QueryId_mutex);
+
+		if (okay)
+		{
+			I_lock_mutex(&m_menu_mutex);
+			{
+				m_waiting_mode = M_WAITING_ROOMS;
+				hosting = ( currentMenu->prevMenu == &MP_ServerDef );
+			}
+			I_unlock_mutex(m_menu_mutex);
+
+			GetRoomsList(hosting, *id);
+		}
+	}
+#ifdef UPDATE_ALERT
+	else
+	{
+		I_lock_mutex(&ms_QueryId_mutex);
+		{
+			okay = ( *id == ms_QueryId );
+		}
+		I_unlock_mutex(ms_QueryId_mutex);
+	}
+#endif
+
+	if (okay)
+	{
+		I_lock_mutex(&m_menu_mutex);
+		{
+			if (m_waiting_mode)
+			{
+				m_waiting_mode = M_NOT_WAITING;
+				MP_RoomMenu[0].text = "<Offline Mode>";
+			}
+		}
+		I_unlock_mutex(m_menu_mutex);
+	}
+
+	free(id);
+}
+#endif/*defined (MASTERSERVER) && defined (HAVE_THREADS)*/
 
 static void M_ConnectMenu(INT32 choice)
 {
@@ -11054,18 +11235,21 @@ static void M_ConnectMenuModChecks(INT32 choice)
 
 	if (modifiedgame)
 	{
-		M_StartMessage(M_GetText("Add-ons are currently loaded.\n\nYou will only be able to join a server if\nit has the same ones loaded in the same order, which may be unlikely.\n\nIf you wish to play on other servers,\nrestart the game to clear existing add-ons.\n\n(Press a key)\n"),M_ConnectMenu,MM_EVENTHANDLER);
+		M_StartMessage(M_GetText("You have add-ons loaded.\nYou won't be able to join netgames!\n\nTo play online, restart the game\nand don't load any addons.\nSRB2 will automatically add\neverything you need when you join.\n\n(Press a key)\n"),M_ConnectMenu,MM_EVENTHANDLER);
 		return;
 	}
 
 	M_ConnectMenu(-1);
 }
 
-static UINT32 roomIds[NUM_LIST_ROOMS];
+UINT32 roomIds[NUM_LIST_ROOMS];
 
 static void M_RoomMenu(INT32 choice)
 {
 	INT32 i;
+#if defined (MASTERSERVER) && defined (HAVE_THREADS)
+	int *id;
+#endif
 
 	(void)choice;
 
@@ -11078,34 +11262,54 @@ static void M_RoomMenu(INT32 choice)
 	if (rendermode == render_soft)
 		I_FinishUpdate(); // page flip or blit buffer
 
-	if (GetRoomsList(currentMenu == &MP_ServerDef) < 0)
-		return;
-
-#ifdef UPDATE_ALERT
-	if (!M_CheckMODVersion())
-		return;
-#endif
-
 	for (i = 1; i < NUM_LIST_ROOMS+1; ++i)
 		MP_RoomMenu[i].status = IT_DISABLED;
 	memset(roomIds, 0, sizeof(roomIds));
 
-	for (i = 0; room_list[i].header.buffer[0]; i++)
-	{
-		if(*room_list[i].name != '\0')
-		{
-			MP_RoomMenu[i+1].text = room_list[i].name;
-			roomIds[i] = room_list[i].id;
-			MP_RoomMenu[i+1].status = IT_STRING|IT_CALL;
-		}
-	}
-
 	MP_RoomDef.prevMenu = currentMenu;
 	M_SetupNextMenu(&MP_RoomDef);
+
+#ifdef MASTERSERVER
+#ifdef HAVE_THREADS
+#ifdef UPDATE_ALERT
+	m_waiting_mode = M_WAITING_VERSION;
+#else/*UPDATE_ALERT*/
+	m_waiting_mode = M_WAITING_ROOMS;
+#endif/*UPDATE_ALERT*/
+
+	MP_RoomMenu[0].text = "";
+
+	id = malloc(sizeof *id);
+
+	I_lock_mutex(&ms_QueryId_mutex);
+	{
+		*id = ms_QueryId;
+	}
+	I_unlock_mutex(ms_QueryId_mutex);
+
+	I_spawn_thread("check-new-version",
+			(I_thread_fn)Check_new_version_thread, id);
+#else/*HAVE_THREADS*/
+#ifdef UPDATE_ALERT
+	if (M_CheckMODVersion(0))
+#endif/*UPDATE_ALERT*/
+	{
+		GetRoomsList(currentMenu->prevMenu == &MP_ServerDef, 0);
+	}
+#endif/*HAVE_THREADS*/
+#endif/*MASTERSERVER*/
 }
 
 static void M_ChooseRoom(INT32 choice)
 {
+#if defined (MASTERSERVER) && defined (HAVE_THREADS)
+	I_lock_mutex(&ms_QueryId_mutex);
+	{
+		ms_QueryId++;
+	}
+	I_unlock_mutex(ms_QueryId_mutex);
+#endif
+
 	if (choice == 0)
 		ms_RoomId = -1;
 	else
