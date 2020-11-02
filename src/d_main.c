@@ -1243,7 +1243,8 @@ void D_SRB2Main(void)
 
 	// for dedicated server
 #if !defined (_WINDOWS) //already check in win_main.c
-	dedicated = M_CheckParm("-dedicated") != 0;
+	//dedicated = M_CheckParm("-dedicated") != 0;
+	// SRB2P: Dedicated server UNSUPPORTED.
 #endif
 
 	if (devparm)

@@ -305,7 +305,8 @@ static inline VOID OpenTextConsole(VOID)
 	console = M_CheckParm("-console") != 0;
 #endif
 
-	dedicated = M_CheckParm("-dedicated") != 0;
+	//dedicated = M_CheckParm("-dedicated") != 0;
+	// SRB2P: Dedicated server UNSUPPORTED.
 
 	if (M_CheckParm("-detachconsole"))
 	{
