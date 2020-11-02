@@ -3405,7 +3405,7 @@ boolean M_Responder(event_t *ev)
 					HU_clearChatChars();
 				//else
 				//	M_StartControlPanel();	SRB2P
-				return true;
+				//return true;
 		}
 		noFurtherInput = false; // turns out we didn't care
 		return false;
