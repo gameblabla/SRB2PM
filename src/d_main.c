@@ -1585,7 +1585,7 @@ void D_SRB2Main(void)
 	if (dedicated)
 		COM_ImmedExecute(va("exec \"%s"PATHSEP"adedserv.cfg\"\n", srb2home));
 	else
-		COM_ImmedExecute(va("exec \"%s"PATHSEP"autoexec.cfg\" -noerror\n", srb2home));
+		COM_ImmedExecute(va("exec \"%s"PATHSEP"SRB2Pautoexec.cfg\" -noerror\n", srb2home));
 
 	if (!autostart)
 		M_PushSpecialParameters(); // push all "+" parameters at the command buffer

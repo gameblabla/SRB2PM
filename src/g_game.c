@@ -62,8 +62,8 @@ JoyType_t Joystick2;
 // 1024 bytes is plenty for a savegame
 #define SAVEGAMESIZE (1024)
 
-char gamedatafilename[64] = "gamedata.dat";
-char timeattackfolder[64] = "main";
+char gamedatafilename[64] = "srb2pdata.dat";	// SRB2P: Technically will be mostly unused as the actual saves are in luafiles, but let's avoid conflicts with vanilla.
+char timeattackfolder[64] = "srb2p";			// Ditto
 char customversionstring[32] = "\0";
 
 static void G_DoCompleted(void);
