@@ -122,7 +122,7 @@ extern char logfilename[1024];
 #endif
 
 /* A mod name to further distinguish versions. */
-#define SRB2APPLICATION "SRB2"
+#define SRB2APPLICATION "SRB2Persona"
 
 #define DEVELOP // Disable this for release builds to remove excessive cheat commands and enable MD5 checking and stuff, all in one go. :3
 #ifdef DEVELOP
@@ -150,7 +150,7 @@ extern char logfilename[1024];
 
 // Does this version require an added patch file?
 // Comment or uncomment this as necessary.
-#define USE_PATCH_DTA
+//#define USE_PATCH_DTA
 
 // Use .kart extension addons
 //#define USE_KART
@@ -168,8 +168,8 @@ extern char logfilename[1024];
 // The string used in the alert that pops up in the event of an update being available.
 // Please change to apply to your modification (we don't want everyone asking where your mod is on SRB2.org!).
 #define UPDATE_ALERT_STRING \
-"A new update is available for SRB2.\n"\
-"Please visit SRB2.org to download it.\n"\
+"A new update is available for SRB2P.\n"\
+"Please visit the SRB2P release thread to download it.\n"\
 "\n"\
 "You are using version: %s\n"\
 "The newest version is: %s\n"\
@@ -185,8 +185,8 @@ extern char logfilename[1024];
 // The string used in the I_Error alert upon trying to host through command line parameters.
 // Generally less filled with newlines, since Windows gives you lots more room to work with.
 #define UPDATE_ALERT_STRING_CONSOLE \
-"A new update is available for SRB2.\n"\
-"Please visit SRB2.org to download it.\n"\
+"A new update is available for SRB2P.\n"\
+"Please visit the SRB2P release thread to download it.\n"\
 "\n"\
 "You are using version: %s\n"\
 "The newest version is: %s\n"\
