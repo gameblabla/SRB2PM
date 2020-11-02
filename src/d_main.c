@@ -1375,7 +1375,7 @@ void D_SRB2Main(void)
 	// Have to be done here before files are loaded
 	M_InitCharacterTables();
 
-	mainwads = 6; // doesn't include music.dta
+	mainwads = 7; // doesn't include music.dta
 #ifdef USE_PATCH_DTA
 	mainwads++;
 #endif
@@ -1388,12 +1388,19 @@ void D_SRB2Main(void)
 #ifndef DEVELOP // md5s last updated 22/02/20 (ddmmyy)
 
 	// Check MD5s of autoloaded files
-	W_VerifyFileMD5(0, ASSET_HASH_SRB2_PK3); // srb2.pk3
-	W_VerifyFileMD5(1, ASSET_HASH_ZONES_PK3); // zones.pk3
+	W_VerifyFileMD5(0, ASSET_HASH_SRB2_PK3); 			// srb2.pk3
+	W_VerifyFileMD5(1, ASSET_HASH_SRB2P_MAIN_PK3);		// SRB2P-main.pk3
+	W_VerifyFileMD5(2, ASSET_HASH_SRB2P_GRAPHICS_PK3);	// SRB2P-graphics.pk3
+	W_VerifyFileMD5(3, ASSET_HASH_SRB2P_CHARS_WAD);		// SRB2P-chars.wad
+	W_VerifyFileMD5(4, ASSET_HASH_SRB2P_MAPS_WAD);		// SRB2P-maps.wad
+	// Music, Sound -> +2
+	W_VerifyFileMD5(7, ASSET_HASH_SRB2P_PATCH_PK3);		// SRB2P-patch.pk3
+	
+	/*W_VerifyFileMD5(1, ASSET_HASH_ZONES_PK3); // zones.pk3
 	W_VerifyFileMD5(2, ASSET_HASH_PLAYER_DTA); // player.dta
 #ifdef USE_PATCH_DTA
 	W_VerifyFileMD5(3, ASSET_HASH_PATCH_PK3); // patch.pk3
-#endif
+#endif*/
 	// don't check music.dta because people like to modify it, and it doesn't matter if they do
 	// ...except it does if they slip maps in there, and that's what W_VerifyNMUSlumps is for.
 #endif //ifndef DEVELOP

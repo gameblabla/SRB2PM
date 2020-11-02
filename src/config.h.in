@@ -11,6 +11,12 @@
 
 #ifdef CMAKECONFIG
 
+#define ASSET_HASH_SRB2P_MAIN_PK3		"${SRB2_ASSET_SRB2P-main.pk3_HASH}"
+#define ASSET_HASH_SRB2P_GRAPHICS_PK3	"${SRB2_ASSET_SRB2P-graphics.pk3_HASH}"
+#define ASSET_HASH_SRB2P_MAPS_WAD		"${SRB2_ASSET_SRB2P-maps.wad_HASH}"
+#define ASSET_HASH_SRB2P_CHARS_WAD		"${SRB2_ASSET_SRB2P-chars.wad_HASH}"
+#define ASSET_HASH_SRB2P_PATCH_PK3		"${SRB2_ASSET_SRB2P-patch.pk3_HASH}"
+
 #define ASSET_HASH_SRB2_PK3   "${SRB2_ASSET_srb2.pk3_HASH}"
 #define ASSET_HASH_PLAYER_DTA "${SRB2_ASSET_player.dta_HASH}"
 #define ASSET_HASH_ZONES_PK3  "${SRB2_ASSET_zones.pk3_HASH}"
@@ -42,5 +48,15 @@
 #define ASSET_HASH_PATCH_PK3  "466cdf60075262b3f5baa5e07f0999e8"
 #endif
 
+/*
+ *SRB2P manually defined hashes for non-CMake builds.
+ */
+
+#define ASSET_HASH_SRB2P_MAIN_PK3		""
+#define ASSET_HASH_SRB2P_GRAPHICS_PK3	""
+#define ASSET_HASH_SRB2P_MAPS_WAD		""
+#define ASSET_HASH_SRB2P_CHARS_WAD		""
+#define ASSET_HASH_SRB2P_PATCH_PK3		""
+ 
 #endif
 #endif
