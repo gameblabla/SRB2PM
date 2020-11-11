@@ -353,7 +353,7 @@ void HWR_DrawIndexPatch(GLPatch_t *gpatch, fixed_t x, fixed_t y, fixed_t pscale,
 	v[0].t = v[1].t = 0.0f;
 	v[2].t = v[3].t = gpatch->max_t;
 
-	flags = PF_Translucent|PF_NoDepthTest;
+	flags = PF_Translucent|PF_NoDepthTest|PF_Modulated;
 
 	if (option & V_WRAPX)
 		flags |= PF_ForceWrapX;
@@ -361,29 +361,25 @@ void HWR_DrawIndexPatch(GLPatch_t *gpatch, fixed_t x, fixed_t y, fixed_t pscale,
 		flags |= PF_ForceWrapY;
 
 	// clip it since it is used for bunny scroll in doom I
-	
+
 	if (alphalevel)
 	{
 		FSurfaceInfo Surf;
-		Surf.PolyColor.s.red = Surf.PolyColor.s.green = Surf.PolyColor.s.blue = 0xff;
+		Surf.PolyColor = Surf.TintColor = Surf.FadeColor = V_GetColor(c);
+		//Surf.PolyColor.s.red = Surf.PolyColor.s.green = Surf.PolyColor.s.blue = 0xff;
 		if (alphalevel == 13) Surf.PolyColor.s.alpha = softwaretranstogl_lo[st_translucency];
 		else if (alphalevel == 14) Surf.PolyColor.s.alpha = softwaretranstogl[st_translucency];
 		else if (alphalevel == 15) Surf.PolyColor.s.alpha = softwaretranstogl_hi[st_translucency];
 		else Surf.PolyColor.s.alpha = softwaretranstogl[10-alphalevel];
-		flags |= PF_Modulated;
-		
-		Surf.PolyColor = V_GetColor(c);
-		
+
 		HWD.pfnDrawPolygon(&Surf, v, 4, flags);
 	}
 	else
-	{	
+	{
 		FSurfaceInfo Surf;
-		Surf.PolyColor = V_GetColor(c);
-		Surf.PolyColor.s.alpha = 255;
-	
+		Surf.PolyColor = Surf.TintColor = Surf.FadeColor = V_GetColor(c);
 		HWD.pfnDrawPolygon(&Surf, v, 4, flags);
-	}	
+	}
 }
 
 
