@@ -2598,8 +2598,8 @@ void GameDigiMusic_OnChange(void)
 
 		if (Playing())
 			P_RestoreMusic(&players[consoleplayer]);
-		else if ((!cv_musicpref.value || midi_disabled) && S_DigExists("_clear"))
-			S_ChangeMusicInternal("_clear", false);
+		else if ((!cv_musicpref.value || midi_disabled) && S_DigExists("_title"))
+			S_ChangeMusicInternal("_title", false);
 	}
 	else
 	{
@@ -2612,7 +2612,7 @@ void GameDigiMusic_OnChange(void)
 				if (Playing())
 					P_RestoreMusic(&players[consoleplayer]);
 				else
-					S_ChangeMusicInternal("_clear", false);
+					S_ChangeMusicInternal("_title", false);
 			}
 		}
 	}

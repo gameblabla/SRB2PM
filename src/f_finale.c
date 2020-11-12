@@ -2445,7 +2445,7 @@ void F_StartTitleScreen(void)
 	if (menupres[MN_MAIN].musname[0])
 		S_ChangeMusic(menupres[MN_MAIN].musname, menupres[MN_MAIN].mustrack, menupres[MN_MAIN].muslooping);
 	else
-		S_ChangeMusicInternal("_title", looptitle);
+		//S_ChangeMusicInternal("_title", looptitle);	//SRB2P: Silent title screen
 
 	if (gamestate != GS_TITLESCREEN && gamestate != GS_WAITINGPLAYERS)
 	{

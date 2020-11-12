@@ -2956,7 +2956,7 @@ static void M_HandleMenuPresState(menu_t *newMenu)
 	}
 
 	// Change the music
-	M_ChangeMenuMusic("_title", false);
+	//M_ChangeMenuMusic("_title", false);	//SRB2P: Silent title screen intro
 
 	// Run the linedef execs
 	if (titlemapinaction)
