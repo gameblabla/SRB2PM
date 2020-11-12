@@ -52,14 +52,15 @@
  *SRB2P manually defined hashes for non-CMake builds.
  
  *Hashes update log:
-	02/11/2020	- RC1	- Added file hashes	
+	02/11/2020	- RC1		- Added file hashes	for testing purposes
+	12/11/2020	- DEMO 1.0	- Final file hashes for DEMO 1.0
  
- */
+*/
  
-#define ASSET_HASH_SRB2P_MAIN_PK3		"1bc851307313406dfa3bf94f790108f0"
-#define ASSET_HASH_SRB2P_GRAPHICS_PK3	"4c1ce3f1fab935cb5895693869cfe42a"
-#define ASSET_HASH_SRB2P_MAPS_WAD		"85677d17e88bc2b20c83b39c4aea3e4c"
-#define ASSET_HASH_SRB2P_CHARS_WAD		"df77ec88cffb819f141fb23aaa39cdb6"
+#define ASSET_HASH_SRB2P_MAIN_PK3		"41cee410d5ba7bd1d4cf4062a9c12bdb"
+#define ASSET_HASH_SRB2P_GRAPHICS_PK3	"9557e41e0a6bbb9dfa0799b1effea8da"
+#define ASSET_HASH_SRB2P_MAPS_WAD		"a8b461123f44b9e9dcfb9a3ac0d9ed11"
+#define ASSET_HASH_SRB2P_CHARS_WAD		"cf2cdf7173f1125d67dad1f55d7785f3"
 #define ASSET_HASH_SRB2P_PATCH_PK3		"a8b9eafc014046fdfba3dc813f2da166"
  
 #endif
