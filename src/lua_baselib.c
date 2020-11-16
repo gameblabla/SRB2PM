@@ -29,6 +29,7 @@
 #include "i_system.h"	// I_ClipboardPaste
 #include "d_netcmd.h" // IsPlayerAdmin
 #include "g_input.h"	//SRB2P
+#include "byteptr.h"	// SRB2P
 #include "m_menu.h" // Player Setup menu color stuff
 
 #include "lua_script.h"
@@ -3488,6 +3489,9 @@ static int lib_srb2pgetEventList(lua_State *L)
 */
 static int lib_srb2pclearEvents(lua_State *L)
 {
+	
+	(void) L:
+	
 	INT32 i;
 	for (i=0; i < lua_eventlength; i++)
 		lua_eventlist[i] = 0;
@@ -3514,6 +3518,8 @@ static int lib_srb2pEatEvent(lua_State *L)
 */
 static int lib_srb2pstartServer(lua_State *L)
 {
+	(void) L;
+	
 	netgame = true;
 	multiplayer = true;
 	return 0;
@@ -3541,6 +3547,9 @@ static int lib_srb2pgetControl(lua_State *L)
 */
 static int lib_srb2pkillHUD(lua_State *L)
 {
+	
+	(void) L;
+	
 	hud_running = false;
 	return 0;	// this will set itself back next frame, necessary to use immedexecute to exit levels
 }
@@ -3589,6 +3598,22 @@ static int lib_srb2pmusicdef(lua_State *L)
 	}
 	return 0;	// SORRY NOTHING
 }
+
+#ifndef NONET
+// SRB2P_synchMyFuckingShit: Synchs the RNG for mid-netgame joining. I hate that this needs to exist
+static int lib_srb2prngSynch(lua_State *L)
+{
+	(void) L;
+	
+	UINT8 buf[8];
+	UINT8 *cp = buf;
+
+	WRITEUINT32(cp, P_GetRandSeed());
+	SendNetXCmd(XD_RANDOMSEED, &buf, 0);
+	
+	return 0;
+}
+#endif
 
 
 static luaL_Reg lib[] = {
@@ -3844,6 +3869,7 @@ static luaL_Reg lib[] = {
 #ifndef NONET
 	{"SRB2P_getListServ",lib_srb2pgetListServ},	// dear GOD.
 	{"SRB2P_startServer",lib_srb2pstartServer},	// dear GOD. x2
+	{"SRB2P_synchMyFuckingShit",lib_srb2prngSynch},	// dear GOD. x3
 #endif
 	{"SRB2P_getEvent",lib_srb2pgetEvent},
 	{"SRB2P_getEventList", lib_srb2pgetEventList},
