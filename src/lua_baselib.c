@@ -3490,7 +3490,7 @@ static int lib_srb2pgetEventList(lua_State *L)
 static int lib_srb2pclearEvents(lua_State *L)
 {
 	
-	(void) L:
+	(void) L;
 	
 	INT32 i;
 	for (i=0; i < lua_eventlength; i++)
