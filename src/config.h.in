@@ -54,10 +54,11 @@
  *Hashes update log:
 	02/11/2020	- RC1		- Added file hashes	for testing purposes
 	12/11/2020	- DEMO 1.0	- Final file hashes for DEMO 1.0
-	16/11/2020	- DEMO 1.1	- SRB2P-main.pk3 
+	16/11/2020	- DEMO 1.1	- SRB2P-main.pk3
+	20/11/2020	- DEMO 1.2	- SRB2P-main.pk3
 */
  
-#define ASSET_HASH_SRB2P_MAIN_PK3		"577a682bd721c8de08f00aa064c9fe63"
+#define ASSET_HASH_SRB2P_MAIN_PK3		"e20947072b67868f59a99c1080ec4b25"
 #define ASSET_HASH_SRB2P_GRAPHICS_PK3	"9557e41e0a6bbb9dfa0799b1effea8da"
 #define ASSET_HASH_SRB2P_MAPS_WAD		"a8b461123f44b9e9dcfb9a3ac0d9ed11"
 #define ASSET_HASH_SRB2P_CHARS_WAD		"2b12e976c57f3b21b7c1b77d87533ee1"
