@@ -808,6 +808,8 @@ void V_DrawStretchyFixedPatch(fixed_t x, fixed_t y, fixed_t pscale, fixed_t vsca
 }
 
 // Draws a patch scaled to arbitrary size and remapped to a single palette color index.
+// We don't want to remap black (palette index 31) pixels
+
 void V_DrawIndexPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_t *patch, INT32 c)
 {
 	//UINT8 (*patchdrawfunc)(const UINT8*, const UINT8*, fixed_t);
@@ -821,6 +823,7 @@ void V_DrawIndexPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_t 
 	const UINT8 *source, *deststop;
 	fixed_t pwidth; // patch width
 	fixed_t offx = 0; // x offset
+	UINT8 psrc;	// source px colour for remapping.
 
 	if (rendermode == render_none)
 		return;
@@ -997,13 +1000,21 @@ void V_DrawIndexPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_t 
 
 			for (ofs = 0; dest < deststop && (ofs>>FRACBITS) < column->length; ofs += rowfrac)
 			{
+
+				// PS; we want to keep pitch black pixels (index 31) black for icons and such
+				psrc = source[ofs>>FRACBITS];
+
 				if (dest >= screens[scrn&V_PARAMMASK]) // don't draw off the top of the screen (CRASH PREVENTION)
 				{
 					// we handle things differently since we already know the color!
 					if (alphalevel)
-						*dest = *(v_translevel + ( ((UINT8)c<<8) + (*dest&0xff)));
+						if (psrc != 31)	// pitch black
+							*dest = *(v_translevel + ( ((UINT8)c<<8) + (*dest&0xff)));	// remap
+						else
+							*dest = *(v_translevel + ( ((UINT8)psrc<<8) + (*dest&0xff)));			// don't
+
 					else
-						*dest = c;
+						*dest = (psrc != 31) ? c : psrc;
 				}
 					 //patchdrawfunc(dest, (const UINT8 *)c, ofs);
 				dest += vid.width;

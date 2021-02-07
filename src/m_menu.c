@@ -343,7 +343,6 @@ static void M_ScreenshotOptions(INT32 choice);
 static void M_SetupScreenshotMenu(void);
 static void M_EraseData(INT32 choice);
 
-static void M_Addons(INT32 choice);
 static void M_AddonsOptions(INT32 choice);
 static patch_t *addonsp[NUM_EXT+5];
 
@@ -1485,7 +1484,7 @@ static menuitem_t OP_SoundOptionsMenu[] =
 
 	{IT_STRING | IT_CVAR,  NULL,  "MIDI Music", &cv_gamemidimusic, 36},
 	{IT_STRING | IT_CVAR | IT_CV_SLIDER, NULL, "MIDI Music Volume", &cv_midimusicvolume, 41},
-	
+
 	{IT_STRING | IT_CVAR,  NULL,  "Music Preference", &cv_musicpref, 51},
 
 	{IT_HEADER, NULL, "Miscellaneous", NULL, 61},
@@ -1695,7 +1694,7 @@ menu_t MISC_AddonsDef =
 	MN_AD_MAIN,
 	NULL,
 	sizeof (MISC_AddonsMenu)/sizeof (menuitem_t),
-	&MainDef,
+	NULL,	//&MainDef,	// SRB2P.
 	MISC_AddonsMenu,
 	M_DrawAddons,
 	50, 28,
@@ -6265,7 +6264,7 @@ static void M_LoadAddonsPatches(void)
 	addonsp[NUM_EXT+4] = W_CachePatchName("M_FSAVE", PU_PATCH);
 }
 
-static void M_Addons(INT32 choice)
+void M_Addons(INT32 choice)
 {
 	const char *pathname = ".";
 
@@ -6770,7 +6769,8 @@ static void M_HandleAddons(INT32 choice)
 			break;
 
 		case KEY_ESCAPE:
-			exitmenu = true;
+			//exitmenu = true;
+			M_ClearMenus(false);	// SRB2P
 			break;
 
 		default:

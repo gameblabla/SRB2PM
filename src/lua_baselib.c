@@ -3489,10 +3489,11 @@ static int lib_srb2pgetEventList(lua_State *L)
 */
 static int lib_srb2pclearEvents(lua_State *L)
 {
-	
-	(void) L;
-	
+
 	INT32 i;
+	(void) L;
+
+
 	for (i=0; i < lua_eventlength; i++)
 		lua_eventlist[i] = 0;
 
@@ -3519,7 +3520,7 @@ static int lib_srb2pEatEvent(lua_State *L)
 static int lib_srb2pstartServer(lua_State *L)
 {
 	(void) L;
-	
+
 	netgame = true;
 	multiplayer = true;
 	return 0;
@@ -3547,9 +3548,9 @@ static int lib_srb2pgetControl(lua_State *L)
 */
 static int lib_srb2pkillHUD(lua_State *L)
 {
-	
+
 	(void) L;
-	
+
 	hud_running = false;
 	return 0;	// this will set itself back next frame, necessary to use immedexecute to exit levels
 }
@@ -3603,17 +3604,27 @@ static int lib_srb2pmusicdef(lua_State *L)
 // SRB2P_synchMyFuckingShit: Synchs the RNG for mid-netgame joining. I hate that this needs to exist
 static int lib_srb2prngSynch(lua_State *L)
 {
-	(void) L;
-	
 	UINT8 buf[8];
 	UINT8 *cp = buf;
+	(void) L;
 
 	WRITEUINT32(cp, P_GetRandSeed());
 	SendNetXCmd(XD_RANDOMSEED, &buf, 0);
-	
+
 	return 0;
 }
 #endif
+
+// SRB2P_openAddonsMenu(): Force open the base game's addon menu.
+static int lib_srb2paddons(lua_State *L)
+{
+	(void) L;
+
+	M_StartControlPanel();
+	M_Addons(0);
+
+	return 0;
+}
 
 
 static luaL_Reg lib[] = {
@@ -3882,6 +3893,8 @@ static luaL_Reg lib[] = {
 
 	{"SRB2P_getMusicList", lib_srb2plistmusicdefs},
 	{"SRB2P_getMusicDef", lib_srb2pmusicdef},
+
+	{"SRB2P_openAddonsMenu", lib_srb2paddons},
 
 	{NULL, NULL}
 };

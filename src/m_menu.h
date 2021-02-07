@@ -365,6 +365,9 @@ extern menu_t SP_LoadDef;
 void M_SetupJoystickMenu(INT32 choice);
 extern menu_t OP_JoystickSetDef;
 
+// for SRB2P Lua:
+void M_Addons(INT32 choice);	// Addons menu
+
 // Stuff for customizing the player select screen
 typedef struct
 {
