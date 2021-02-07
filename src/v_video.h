@@ -199,6 +199,9 @@ UINT8 *V_GetStringColormap(INT32 colorflags);
 
 void V_DrawLevelTitle(INT32 x, INT32 y, INT32 option, const char *string);
 
+fixed_t V_SRB2PgenericStringWidth(const char *string, const char *prefix, fixed_t scale);
+void V_SRB2PgenericDrawString(INT32 x, INT32 y, const char *string, const char *prefix, INT32 flags, const char *alignment, UINT8 color, UINT8 color2, fixed_t scale);
+
 // wordwrap a string using the hu_font
 char *V_WordWrap(INT32 x, INT32 w, INT32 option, const char *string);
 UINT8 *V_GetStringColormap(INT32 colorflags);

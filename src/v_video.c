@@ -2307,6 +2307,194 @@ char *V_WordWrap(INT32 x, INT32 w, INT32 option, const char *string)
 	return newstring;
 }
 
+// Generic string width
+fixed_t V_SRB2PgenericStringWidth(const char *string, const char *prefix, fixed_t scale)
+{
+	fixed_t xoffs = 0;
+
+	const char *s = string;
+	char lumpname[16];	// plenty of space
+	unsigned char c;
+
+	// Patch stuff
+	lumpnum_t lumpnum;
+	patch_t *pp = NULL;
+
+	if (!s[0])
+		return 0;
+
+	for (;; s++)
+	{
+
+
+		if (! (*s))
+			break;	// '\0'
+
+		strcpy(lumpname, "");	// Reset lump name.
+
+		c = (unsigned)*s;
+
+		if (c >= 0x80 && c <= 0x8F)	// colourcodes
+			continue;
+
+		if (c == '\n')
+		{
+			// Line breaks
+			xoffs = 0;
+			continue;
+		}
+
+		// Evaluate the lumpname.
+		// Lumpname should be "prefixNNN", so for instance; NFNT065 for letter 'A' of the font 'NFNT'
+
+		strcat(lumpname, prefix);
+		strcat(lumpname, ascii_03d[(UINT32)c -1]);	// -1. Remember that tables start at 0
+
+		// Now we need to get the patch
+
+		lumpnum = W_CheckNumForLongName(lumpname);	//W_CachePatchLongName(lumpname, PU_PATCH)
+
+		if (lumpnum != LUMPERROR)
+		{
+			// Patch exists
+			pp = W_CacheLumpNum(lumpnum, PU_PATCH);
+			// Adjust x offsets
+			xoffs += (pp->width)*scale + scale/2;	// Add some wiggle room
+
+		}
+		else
+			// Lump doesn't exist? Consider it a space!
+			xoffs += 10*scale;
+	}
+
+	return xoffs;
+}
+
+// No I'm not proud of that one either.
+// Returns a palette index for a given colourcode.
+static UINT8 charcode2index(unsigned char c)
+{
+	CONS_Printf("Get charcode...\n");
+	switch(c)
+	{
+		case 0x81:
+			return 130;	// Magenta
+		case 0x82:
+			return 73;	// Yellow
+		case 0x83:
+			return 103;	// Green
+		case 0x84:
+			return 151;	// Blue
+		case 0x85:
+			return 35;	// Red
+		case 0x86:
+			return 20;	// Grey
+		case 0x87:
+			return 54;	// Orange
+		case 0x88:
+			return 141;	// Sky
+		case 0x89:
+			return 164;	// Purple
+		case 0x8A:
+			return 123;	// Aqua
+		case 0x8B:
+			return 96;	// Peridot
+		case 0x8C:
+			return 147;	// Azure
+		case 0x8D:
+			return 230;	// Brown
+		case 0x8E:
+			return 202;	// Pink
+		case 0x8F:
+			return 24;	// Black
+
+		default:
+			return 0;	// White
+
+	}
+
+}
+
+// Tired of having 382942 functions, why didn't we just have a generic drawstring function from the start damnit
+void V_SRB2PgenericDrawString(INT32 x, INT32 y, const char *string, const char *prefix, INT32 flags, const char *alignment, UINT8 color, UINT8 color2, fixed_t scale)
+{
+	fixed_t xoffs = 0;
+	fixed_t yoffs = 0;
+
+	const char *s = string;
+	char lumpname[16];	// plenty of space
+	unsigned char c;
+
+	// Patch stuff
+	lumpnum_t lumpnum;
+	patch_t *pp = NULL;
+
+	if (s[0] == '\0')
+		return;	// No!!
+
+	// Apply alignments
+	if (!strcmp(alignment, "right"))
+		x -= V_SRB2PgenericStringWidth(string, prefix, scale);
+
+	else if (!strcmp(alignment, "center"))
+		x -= (V_SRB2PgenericStringWidth(string, prefix, scale)/2);
+
+	for (;; s++)
+	{
+
+		if (! (*s))
+			break;	// '\0'
+
+		c = (unsigned)*s;
+
+		strcpy(lumpname, "");	// Reset lump name.
+
+		if (c >= 0x80 && c <= 0x8F)
+		{
+			color = charcode2index(c);
+			continue;
+		}
+
+		if (c == '\n')
+		{
+			// Line breaks
+			yoffs += 16*scale;
+			xoffs = 0;
+			continue;
+		}
+
+		// Evaluate the lumpname.
+		// Lumpname should be "prefixNNN", so for instance; NFNT065 for letter 'A' of the font 'NFNT'
+
+		strcat(lumpname, prefix);
+		strcat(lumpname, ascii_03d[(UINT32)c -1]);	// -1. Remember that tables start at 0. Make it unsigned in case we have characters above 128!
+
+		// Now we need to get the patch
+
+		lumpnum = W_CheckNumForLongName(lumpname);	//W_CachePatchLongName(lumpname, PU_PATCH)
+
+		if (lumpnum != LUMPERROR)
+		{
+			// Patch exists
+			pp = W_CacheLumpNum(lumpnum, PU_PATCH);
+
+			if (color2)	// dropshadow
+				V_DrawIndexPatch(x + xoffs + (2*scale), y + yoffs + (2*scale), scale, flags, pp, color2);
+
+			// Now draw it.
+			V_DrawIndexPatch(x + xoffs, y + yoffs, scale, flags, pp, color);
+
+			// Adjust x offsets
+			xoffs += (pp->width)*scale + scale/2;	// Add some wiggle room
+
+		}
+		else
+			// Lump doesn't exist? Consider it a space!
+			xoffs += 10*scale;
+
+	}
+}
+
 //
 // Write a string using the hu_font
 // NOTE: the text is centered for screens larger than the base width

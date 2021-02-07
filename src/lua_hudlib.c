@@ -803,6 +803,27 @@ static int libd_drawFill(lua_State *L)
 	return 0;
 }
 
+static int libd_genericString(lua_State *L)
+{
+	fixed_t x = luaL_checkinteger(L, 1);
+	fixed_t y = luaL_checkinteger(L, 2);
+	const char *str = luaL_checkstring(L, 3);
+	const char *prefix = luaL_checkstring(L, 4);
+	INT32 flags = luaL_optinteger(L, 5, 0);
+	const char *align = luaL_checkstring(L, 6);
+	INT32 color = luaL_optinteger(L, 7, 0);
+	INT32 color2 = luaL_optinteger(L, 8, 31);
+	fixed_t scale = luaL_optinteger(L, 9, FRACUNIT/2);
+
+	flags &= ~V_PARAMMASK; // Don't let crashes happen.
+
+	HUDONLY
+	V_SRB2PgenericDrawString(x, y, str, prefix, flags, align, color, color2, scale);
+
+	return 0;
+
+}
+
 static int libd_drawString(lua_State *L)
 {
 	fixed_t x = luaL_checkinteger(L, 1);
@@ -1173,6 +1194,7 @@ static luaL_Reg lib_draw[] = {
 	{"drawNum", libd_drawNum},
 	{"drawPaddedNum", libd_drawPaddedNum},
 	{"drawFill", libd_drawFill},
+	{"genericString", libd_genericString},
 	{"drawString", libd_drawString},
 	{"drawNameTag", libd_drawNameTag},
 	{"drawScaledNameTag", libd_drawScaledNameTag},
