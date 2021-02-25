@@ -2374,7 +2374,6 @@ fixed_t V_SRB2PgenericStringWidth(const char *string, const char *prefix, fixed_
 // Returns a palette index for a given colourcode.
 static UINT8 charcode2index(unsigned char c)
 {
-	CONS_Printf("Get charcode...\n");
 	switch(c)
 	{
 		case 0x81:
@@ -2468,7 +2467,7 @@ void V_SRB2PgenericDrawString(INT32 x, INT32 y, const char *string, const char *
 
 		strcat(lumpname, prefix);
 		strcat(lumpname, ascii_03d[(UINT32)c -1]);	// -1. Remember that tables start at 0. Make it unsigned in case we have characters above 128!
-
+		
 		// Now we need to get the patch
 
 		lumpnum = W_CheckNumForLongName(lumpname);	//W_CachePatchLongName(lumpname, PU_PATCH)

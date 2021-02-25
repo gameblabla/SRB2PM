@@ -61,7 +61,7 @@
 //              heads up font
 //-------------------------------------------
 
-char ascii_03d[HU_FONTSIZE][4];
+char ascii_03d[256][4];
 
 patch_t *hu_font[HU_FONTSIZE];
 patch_t *tny_font[HU_FONTSIZE];
@@ -189,10 +189,9 @@ void HU_LoadGraphics(void)
 	if (dedicated)
 		return;
 
-	j = 0;
 	// cache a table of 000, 003, 002, [...] 255 for generic string drawer
-	for (; j < 256; j++)
-		sprintf(ascii_03d[j], "%.3d", j+1);
+	for (i = 0; i < 256; i++)
+		sprintf(ascii_03d[i], "%03d", i+1);
 
 	j = HU_FONTSTART;
 	for (i = 0; i < HU_FONTSIZE; i++, j++)
