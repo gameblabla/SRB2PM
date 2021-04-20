@@ -176,9 +176,9 @@ INT32 lua_eatevent = 0;		// SRB2P: cancel events
 void D_ProcessEvents(void)
 {
 	event_t *ev;
-	curevent = 0;	// reset this every call.
-
 	boolean eaten;
+	
+	curevent = 0;	// reset this every call.
 
 	for (; eventtail != eventhead; eventtail = (eventtail+1) & (MAXEVENTS-1))
 	{

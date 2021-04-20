@@ -832,7 +832,7 @@ void V_DrawIndexPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_t 
 	// oh please
 	if (rendermode != render_soft && !con_startup)
 	{
-		HWR_DrawIndexPatch((GLPatch_t *)patch, x, y, pscale, pscale, scrn, c);
+		HWR_DrawIndexPatch(patch, x, y, pscale, pscale, scrn, c);
 		return;
 	}
 #endif
