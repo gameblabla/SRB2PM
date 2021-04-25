@@ -169,9 +169,8 @@ void V_DrawCroppedPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_
 
 void V_DrawContinueIcon(INT32 x, INT32 y, INT32 flags, INT32 skinnum, UINT16 skincolor);
 
-// Draw a patch with a solid color.
-// @TODO: make it fully work in GL. Doesn't matter for SRB2PERSONA, since graphics take this in mind.
-void V_DrawIndexPatch(fixed_t x, fixed_t y, fixed_t pscale, INT32 scrn, patch_t *patch, INT32 c);
+#define V_DrawIndexPatch(x, y, s, f, p, c) V_DrawIndexStretchyPatch(x, y, s, s, f, p, c)
+void V_DrawIndexStretchyPatch(fixed_t x, fixed_t y, fixed_t pscale, fixed_t vscale, INT32 scrn, patch_t *patch, INT32 c);
 
 // Draw a linear block of pixels into the view buffer.
 void V_DrawBlock(INT32 x, INT32 y, INT32 scrn, INT32 width, INT32 height, const UINT8 *src);

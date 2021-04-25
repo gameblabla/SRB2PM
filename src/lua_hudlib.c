@@ -631,6 +631,32 @@ static int libd_drawIndexScaled(lua_State *L)
 	return 0;
 }
 
+static int libd_drawIndexStretched(lua_State *L)
+{
+	fixed_t x, y, scale, vscale;
+	INT32 flags;
+	patch_t *patch;
+	INT32 color;
+
+	HUDONLY
+	x = luaL_checkinteger(L, 1);
+	y = luaL_checkinteger(L, 2);
+	scale = luaL_checkinteger(L, 3);
+	if (scale < 0)
+		return luaL_error(L, "negative scale");
+	vscale = luaL_checkinteger(L, 4);
+	if (vscale < 0)
+		return luaL_error(L, "negative vscale");	
+	patch = *((patch_t **)luaL_checkudata(L, 5, META_PATCH));
+	flags = luaL_optinteger(L, 6, 0);
+	color = luaL_checkinteger(L, 7);
+
+	flags &= ~V_PARAMMASK; // Don't let crashes happen.
+
+	V_DrawIndexStretchyPatch(x, y, scale, vscale, flags, patch, color);
+	return 0;
+}
+
 static int libd_drawScaled(lua_State *L)
 {
 	fixed_t x, y, scale;
@@ -1129,6 +1155,7 @@ static luaL_Reg lib_draw[] = {
 	{"draw", libd_draw},
 	{"drawScaled", libd_drawScaled},
 	{"drawIndex", libd_drawIndexScaled},
+	{"drawStretchedIndex", libd_drawIndexStretched},
 	{"drawStretched", libd_drawStretched},
 	{"drawNum", libd_drawNum},
 	{"drawPaddedNum", libd_drawPaddedNum},
