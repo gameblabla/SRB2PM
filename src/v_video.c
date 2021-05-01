@@ -2449,15 +2449,12 @@ fixed_t V_SRB2PgenericStringWidth(const char *string, const char *prefix, fixed_
 
 		// Now we need to get the patch
 
-		lumpnum = W_CheckNumForLongName(lumpname);	//W_CachePatchLongName(lumpname, PU_PATCH)
-
-		if (lumpnum != LUMPERROR)
+		if (W_CheckNumForLongName(lumpname) != LUMPERROR)
 		{
 			// Patch exists
-			pp = W_CacheLumpNum(lumpnum, PU_PATCH);
+			pp = (patch_t *)W_CachePatchLongName(lumpname, PU_HUDGFX);
 			// Adjust x offsets
 			xoffs += (pp->width)*scale + scale/2;	// Add some wiggle room
-
 		}
 		else
 			// Lump doesn't exist? Consider it a space!
@@ -2522,8 +2519,10 @@ void V_SRB2PgenericDrawString(INT32 x, INT32 y, const char *string, const char *
 	unsigned char c;
 
 	// Patch stuff
-	lumpnum_t lumpnum;
 	patch_t *pp;
+	
+	/*if (rendermode == render_opengl)
+		return;*/
 
 	if (s[0] == '\0')
 		return;	// No!!
@@ -2565,14 +2564,11 @@ void V_SRB2PgenericDrawString(INT32 x, INT32 y, const char *string, const char *
 		strcat(lumpname, prefix);
 		strcat(lumpname, ascii_03d[(UINT32)c -1]);	// -1. Remember that tables start at 0. Make it unsigned in case we have characters above 128!
 
-		// Now we need to get the patch
-		lumpnum = W_CheckNumForLongName(lumpname);	//W_CachePatchLongName(lumpname, PU_PATCH)
-
-		if (lumpnum != LUMPERROR)
+		if (W_CheckNumForLongName(lumpname) != LUMPERROR)
 		{
 			// Patch exists
-			pp =  W_CachePatchName(lumpname, PU_HUDGFX);	//(patch_t *)W_CacheLumpNum(lumpnum, PU_PATCH);
-
+			pp =  (patch_t *)W_CachePatchLongName(lumpname, PU_HUDGFX);
+			
 			if (color2)	// dropshadow
 				V_DrawIndexPatch(x + xoffs + (2*scale), y + yoffs + (2*scale), scale, flags, pp, color2);
 
