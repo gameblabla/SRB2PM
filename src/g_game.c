@@ -761,6 +761,10 @@ void G_SetNightsRecords(void)
 // for consistency among messages: this modifies the game and removes savemoddata.
 void G_SetGameModified(boolean silent)
 {
+	// SRB2P:
+	if (1)
+		return;
+	
 	if (modifiedgame && !savemoddata)
 		return;
 
