@@ -265,7 +265,9 @@ void Got_LuaFile(UINT8 **cp, INT32 playernum)
 {
 	FILE **pf = NULL;
 	UINT8 success = READUINT8(*cp); // The first (and only) byte indicates whether the file could be opened
-
+	
+	CONS_Printf("Got_LuaFile (XD_LUAFILE) (Success=%d)\n", success ? 1 : 0);
+	
 	if (playernum != serverplayer)
 	{
 		CONS_Alert(CONS_WARNING, M_GetText("Illegal luafile command received from %s\n"), player_names[playernum]);
@@ -292,6 +294,7 @@ void Got_LuaFile(UINT8 **cp, INT32 playernum)
 		// Ensure we are opening in binary mode
 		// (if it's a text file, newlines have been converted already)
 		strcpy(mode, luafiletransfers->mode);
+		CONS_Printf("Open mode: %s\n", mode);
 		if (!strchr(mode, 'b'))
 			strcat(mode, "b");
 

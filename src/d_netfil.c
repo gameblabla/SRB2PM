@@ -584,12 +584,22 @@ void SV_PrepareSendLuaFile(void)
 {
 	char *binfilename;
 	INT32 i;
+	
+	CONS_Printf("SV_PrepareSendLuaFile...\n");
 
 	luafiletransfers->ongoing = true;
 
 	// Set status to "waiting" for everyone
 	for (i = 0; i < MAXNETNODES; i++)
-		luafiletransfers->nodestatus[i] = (nodeingame[i] ? LFTNS_WAITING : LFTNS_NONE);
+	{
+		if (nodeingame[i])
+		{
+			CONS_Printf("Node %d: Set to waiting status\n", i);
+			luafiletransfers->nodestatus[i] = LFTNS_WAITING;
+		}
+		else
+			luafiletransfers->nodestatus[i] = LFTNS_NONE;
+	}	
 
 	if (FIL_ReadFileOK(luafiletransfers->realfilename))
 	{
