@@ -390,7 +390,7 @@ INT32 CL_CheckFiles(void)
 	// Modified game handling -- check for an identical file list
 	// must be identical in files loaded AND in order
 	// Return 2 on failure -- disconnect from server
-	if (modifiedgame)
+	if (modifiedgame && 0)	// SRB2P: Don't do that.
 	{
 		CONS_Debug(DBG_NETPLAY, "game is modified; only doing basic checks\n");
 		for (i = 1, j = 1; i < fileneedednum || j < numwadfiles;)
@@ -584,7 +584,7 @@ void SV_PrepareSendLuaFile(void)
 {
 	char *binfilename;
 	INT32 i;
-	
+
 	CONS_Printf("SV_PrepareSendLuaFile...\n");
 
 	luafiletransfers->ongoing = true;
@@ -599,7 +599,7 @@ void SV_PrepareSendLuaFile(void)
 		}
 		else
 			luafiletransfers->nodestatus[i] = LFTNS_NONE;
-	}	
+	}
 
 	if (FIL_ReadFileOK(luafiletransfers->realfilename))
 	{
