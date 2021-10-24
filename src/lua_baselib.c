@@ -3945,6 +3945,22 @@ static int lib_srb2prngSynch(lua_State *L)
 
 	return 0;
 }
+
+// SRB2P_getPing(n)
+// Gets a player's ping from playerpingtable
+
+static int lib_srb2pgetPing(lua_State *L)
+{
+	const INT32 num = luaL_checkinteger(L, 1);
+	INT32 ping = 0;
+	
+	if (num >= 0 && num < MAXPLAYERS && playeringame[num])
+		ping = playerpingtable[num];
+	
+	lua_pushinteger(L, ping);
+	return 1;
+}
+
 #endif
 
 // SRB2P_openAddonsMenu(): Force open the base game's addon menu.
@@ -4229,6 +4245,7 @@ static luaL_Reg lib[] = {
 	{"SRB2P_getListServ",lib_srb2pgetListServ},	// dear GOD.
 	{"SRB2P_startServer",lib_srb2pstartServer},	// dear GOD. x2
 	{"SRB2P_synchMyFuckingShit",lib_srb2prngSynch},	// dear GOD. x3
+	{"SRB2P_getPing", lib_srb2pgetPing},
 #endif
 	{"SRB2P_getEvent",lib_srb2pgetEvent},
 	{"SRB2P_getEventList", lib_srb2pgetEventList},
