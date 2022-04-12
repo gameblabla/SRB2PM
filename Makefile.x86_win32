@@ -1,0 +1,37 @@
+PRGNAME     = srb2pm_x86.exe
+
+# define regarding OS, which compiler to use
+CC          = i686-w64-mingw32-gcc
+
+# change compilation / linking flag options
+CFLAGS		=  -I/usr/i686-w64-mingw32/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT -I/usr/i686-w64-mingw32/include/libpng16
+CFLAGS		+=  -fno-exceptions -Isrc/sdl12
+
+CFLAGS		+= -D_WIN32 -Wno-trigraphs
+CFLAGS		+= -DDIRECTFULLSCREEN  -DHAVE_MIXER -DHAVE_PNG -DHAVE_CURL
+CFLAGS		+= -DHAVE_SDL -DHAVE_ZLIB -DNONX86 -DNORUSEASM
+CFLAGS		+= -DSOUND=SOUND_MIXER -DCURL_STATICLIB -DNOSECUREHTTP -D__MSVCRT_VERSION__=0x600 -D_WIN32_WINNT=0x400
+
+CFLAGS		+= -Ofast -fno-stack-protector -mno-sse2 -flto -fno-PIC 
+
+LDFLAGS     = -Wl,--start-group -lSDLmain -lSDL -lwinmm -lSDL_mixer -lmpg123 -lws2_32 -lgdi32 -limm32 -lpng -lcurl -lm -lz -logg -lvorbis -lvorbisfile -Wl,--end-group
+LDFLAGS	   += -s -flto -static
+
+# Files to be compiled
+SRCDIR    = ./src ./src/sdl12 ./src/blua
+VPATH     = $(SRCDIR)
+SRC_C   = $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
+OBJ_C   = $(notdir $(patsubst %.c, %.o, $(SRC_C)))
+OBJS     = $(OBJ_C)
+
+# Rules to make executable
+$(PRGNAME): $(OBJS)  
+	i686-w64-mingw32-windres my.rc -o icon.o
+	$(CC) $(CFLAGS)  icon.o $^ -o $(PRGNAME) $(LDFLAGS)
+
+$(OBJ_C) : %.o : %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+
+clean:
+	rm -f *.o

@@ -23,6 +23,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_PNG
+
 #include "apng.h"
 
 #define APNG_INFO_acTL 0x20000U
@@ -287,3 +289,5 @@ apng_set_set_acTL_fn (png_structp pngp, apng_infop ainfop,
 	else
 		ainfop->set_acTL_fn = set_acTL_f;
 }
+
+#endif

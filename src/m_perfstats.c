@@ -149,7 +149,7 @@ static void M_DrawPerfCount(perfstatcol_t *col)
 
 static void M_DrawRenderStats(void)
 {
-	const boolean hires = M_HighResolution();
+	/*const boolean hires = M_HighResolution();
 
 	const int half_row = hires ? 5 : 4;
 
@@ -317,7 +317,7 @@ static void M_DrawRenderStats(void)
 			M_DrawPerfCount(&batchcalls_col);
 		}
 #endif
-	}
+	}*/
 }
 
 static void M_DrawTickStats(void)

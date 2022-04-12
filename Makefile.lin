@@ -1,0 +1,36 @@
+PRGNAME     = srb2.elf
+
+# define regarding OS, which compiler to use
+CC          = gcc
+
+# change compilation / linking flag options
+CFLAGS		=  -I/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRAN
+CFLAGS		+=  -fno-exceptions -Isrc/sdl12
+
+CFLAGS		+= -DLINUX -DUNIX -Wno-trigraphs
+CFLAGS		+= -DDIRECTFULLSCREEN  -DHAVE_MIXER -DHAVE_PNG
+CFLAGS		+= -DHAVE_SDL -DHAVE_ZLIB -DNONX86 -DNORUSEASM -DFUNKEY
+CFLAGS		+= -DSOUND=SOUND_MIXER
+
+CFLAGS		+= -Ofast -fno-stack-protector
+
+LDFLAGS     = -lc -lrt -lSDLmain -lSDL -lSDL_mixer -lmpg123 -lm -lz -lpng
+LDFLAGS	   += -s -flto
+
+# Files to be compiled
+SRCDIR    = ./src ./src/sdl12 ./src/blua
+VPATH     = $(SRCDIR)
+SRC_C   = $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
+OBJ_C   = $(notdir $(patsubst %.c, %.o, $(SRC_C)))
+OBJS     = $(OBJ_C)
+
+# Rules to make executable
+$(PRGNAME): $(OBJS)  
+	$(CC) $(CFLAGS) $^ -o $(PRGNAME) $(LDFLAGS)
+
+$(OBJ_C) : %.o : %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+
+clean:
+	rm -f *.o

@@ -1512,4 +1512,4 @@ boolean I_InitTcpNetwork(void)
 	return ret;
 }
 
-#include "i_addrinfo.c"
+#include "i_addrinfo.cp"

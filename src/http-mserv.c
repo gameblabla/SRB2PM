@@ -202,6 +202,10 @@ HMS_connect (const char *format, ...)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, HMS_on_read);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
 
+#ifndef NOSECUREHTTP
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1);
+	curl_easy_setopt(curl, CURLOPT_CAINFO, "./cacert.pem");
+#endif
 	curl_free(quack_token);
 	free(url);
 

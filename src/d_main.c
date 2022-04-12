@@ -637,10 +637,10 @@ static void D_Display(void)
 			V_DrawRightAlignedString(BASEVIDWIDTH, BASEVIDHEIGHT-ST_HEIGHT-10, V_YELLOWMAP, s);
 		}
 
-		if (cv_perfstats.value)
+		/*if (cv_perfstats.value)
 		{
 			M_DrawPerfStats();
-		}
+		}*/
 
 		ps_swaptime = I_GetPreciseTime();
 		I_FinishUpdate(); // page flip or blit buffer

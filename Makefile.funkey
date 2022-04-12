@@ -1,0 +1,36 @@
+PRGNAME     = srb2.elf
+
+# define regarding OS, which compiler to use
+CC          = /opt/funkey-toolchain-shared/bin/arm-linux-gcc
+
+# change compilation / linking flag options
+CFLAGS		=  -I/opt/funkey-toolchain-shared/arm-funkey-linux-musleabihf/sysroot/usr/include/SDL -D_GNU_SOURCE=1 -D_REENTRAN
+CFLAGS		+=  -fno-exceptions -Isrc/sdl12
+
+CFLAGS		+= -DLINUX -DUNIX -Wno-trigraphs
+CFLAGS		+= -DDIRECTFULLSCREEN  -DHAVE_MIXER -DHAVE_PNG -DNONET
+CFLAGS		+= -DHAVE_SDL -DHAVE_ZLIB -DNONX86 -DNORUSEASM -DFUNKEY -DGCW0 -DGCW
+CFLAGS		+= -DSOUND=SOUND_MIXER
+
+CFLAGS		+= -Ofast -fno-stack-protector -flto -fno-PIC
+
+LDFLAGS     = -lc -lrt -lSDLmain -lSDL -lSDL_mixer -lmikmod -logg -lvorbisfile -lmpg123 -lm -lz -lpng
+LDFLAGS	   += -s -flto
+
+# Files to be compiled
+SRCDIR    = ./src ./src/sdl12 ./src/blua
+VPATH     = $(SRCDIR)
+SRC_C   = $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
+OBJ_C   = $(notdir $(patsubst %.c, %.o, $(SRC_C)))
+OBJS     = $(OBJ_C)
+
+# Rules to make executable
+$(PRGNAME): $(OBJS)  
+	$(CC) $(CFLAGS) $^ -o $(PRGNAME) $(LDFLAGS)
+
+$(OBJ_C) : %.o : %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+
+clean:
+	rm -f *.o
