@@ -195,7 +195,7 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 	statenum_t *seenstate = seenstate_tab; // pointer to table
 	static INT32 recursion; // detects recursion
 	statenum_t i; // initial state
-	statenum_t tempstate[NUMSTATES]; // for use with recursion
+	statenum_t* tempstate = NULL; // for use with recursion
 
 #ifdef PARANOIA
 	if (player == NULL)
@@ -306,8 +306,11 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 		break;
 	}
 
-	if (recursion++) // if recursion detected,
-		memset(seenstate = tempstate, 0, sizeof tempstate); // clear state table
+	if (recursion++) { // if recursion detected,
+		tempstate = (statenum_t*)malloc(sizeof(statenum_t) * NUMSTATES);
+		if (!tempstate) I_Error("P_SetMobjState malloc gave null!\n");
+		memset(seenstate = tempstate, 0, sizeof(statenum_t) * NUMSTATES); // clear state table
+	}
 
 	i = state;
 
@@ -317,6 +320,8 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 		{ // Bad SOC!
 			CONS_Alert(CONS_ERROR, "Cannot remove player mobj by setting its state to S_NULL.\n");
 			//P_RemoveMobj(mobj);
+			if (tempstate) free(tempstate);
+			tempstate = NULL;
 			return false;
 		}
 
@@ -429,6 +434,8 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 					{
 						if (mobj->frame & FF_FRAMEMASK)
 							mobj->frame--;
+						if (tempstate) free(tempstate);
+						tempstate = NULL;
 						return P_SetPlayerMobjState(mobj, st->var1);
 					}
 				}
@@ -462,8 +469,11 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 
 			// woah. a player was removed by an action.
 			// this sounds like a VERY BAD THING, but there's nothing we can do now...
-			if (P_MobjWasRemoved(mobj))
+			if (P_MobjWasRemoved(mobj)) {
+				if (tempstate) free(tempstate);
+				tempstate = NULL;
 				return false;
+			}
 		}
 
 		seenstate[state] = 1 + st->nextstate;
@@ -478,6 +488,8 @@ boolean P_SetPlayerMobjState(mobj_t *mobj, statenum_t state)
 		for (;(state = seenstate[i]) > S_NULL; i = state - 1)
 			seenstate[i] = S_NULL; // erase memory of states
 
+	if (tempstate) free(tempstate);
+	tempstate = NULL;
 	return true;
 }
 
@@ -491,21 +503,26 @@ boolean P_SetMobjState(mobj_t *mobj, statenum_t state)
 	statenum_t *seenstate = seenstate_tab; // pointer to table
 	static INT32 recursion; // detects recursion
 	statenum_t i = state; // initial state
-	statenum_t tempstate[NUMSTATES]; // for use with recursion
+	statenum_t *tempstate = NULL; // for use with recursion
 
 #ifdef PARANOIA
 	if (mobj->player != NULL)
 		I_Error("P_SetMobjState used for player mobj. Use P_SetPlayerMobjState instead!\n(State called: %d)", state);
 #endif
 
-	if (recursion++) // if recursion detected,
-		memset(seenstate = tempstate, 0, sizeof tempstate); // clear state table
+	if (recursion++) { // if recursion detected,
+		tempstate = (statenum_t*)malloc(sizeof(statenum_t) * NUMSTATES);
+		if (!tempstate) I_Error("P_SetMobjState malloc gave null!\n");
+		memset(seenstate = tempstate, 0, sizeof(statenum_t) * NUMSTATES); // clear state table
+	}
 
 	do
 	{
 		if (state == S_NULL)
 		{
 			P_RemoveMobj(mobj);
+			if (tempstate) free(tempstate);
+			tempstate = NULL;
 			return false;
 		}
 
