@@ -174,7 +174,7 @@ SDL_Surface* real_screen;
 #endif
 
 // maximum number of windowed modes (see windowedModes[][])
-#if defined (_WIN32_WCE) || defined (DC) || defined (PSP) || defined(GP2X) || defined(BITTBOY) || defined (GCW0) || defined (OGA) || defined (FUNKEY)
+#if defined (_WIN32_WCE) || defined (DC) || defined (PSP) || defined(GP2X) || defined(BITTBOY) || defined (GCW0) || defined (OGA) || defined (FUNKEY) || defined (WII)
 #define MAXWINMODES (1)
 #elif defined (WII)
 #define MAXWINMODES (8)
@@ -262,6 +262,8 @@ static INT32 windowedModes[MAXWINMODES][2] =
 {
 #if defined(FUNKEY)
 	{ 320, 200}, // 1.33,1.00
+#elif defined(WII)
+	{ 320, 240}, // 1.33,1.00
 #elif defined(RS1)
 	{ 640, 480}, // 1.33,1.00
 #elif defined(GCW0)
@@ -314,9 +316,6 @@ static void SDLSetMode(INT32 width, INT32 height, INT32 bpp, Uint32 flags)
 	if (bpp < 16)
 		bpp = 16; // 256 mode poo
 #endif
-#ifdef _WII
-	bpp = 16; // 8-bit mode poo
-#endif
 #ifdef DC
 	if (bpp < 15)
 		bpp = 15;
@@ -347,6 +346,15 @@ static void SDLSetMode(INT32 width, INT32 height, INT32 bpp, Uint32 flags)
 	if (!vidSurface) vidSurface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, bpp, 0, 0, 0, 0);
 	
 	if (!real_screen)
+		return;
+#elif defined(WII)
+	if (vidSurface)
+		return;
+	bpp = 16;
+	width = 320;
+	height = 240;
+	vidSurface = SDL_SetVideoMode(width, height, 16, SDL_SWSURFACE);
+	if (!vidSurface)
 		return;
 #elif defined(RS1)
 	if (real_screen)
@@ -430,10 +438,6 @@ static void SDLSetMode(INT32 width, INT32 height, INT32 bpp, Uint32 flags)
 #else
 	if (SDLVD && strncasecmp(SDLVD,"glSDL",6) == 0) //for glSDL videodriver
 		vidSurface = SDL_SetVideoMode(width, height,0,SDL_DOUBLEBUF);
-#ifdef _WII // don't want it to use HWSURFACE, so make it first here
-	else if (SDL_VideoModeOK(width, height, bpp, flags|SDL_SWSURFACE|SDL_DOUBLEBUF) >= bpp) // SDL Wii uses double buffering
-		vidSurface = SDL_SetVideoMode(width, height, bpp, flags|SDL_SWSURFACE|SDL_DOUBLEBUF);
-#endif
 	else if (cv_vidwait.value && videoblitok && SDL_VideoModeOK(width, height, bpp, flags|SDL_HWSURFACE|SDL_DOUBLEBUF) >= bpp)
 		vidSurface = SDL_SetVideoMode(width, height, bpp, flags|SDL_HWSURFACE|SDL_DOUBLEBUF);
 	else if (videoblitok && SDL_VideoModeOK(width, height, bpp, flags|SDL_HWSURFACE) >= bpp)
@@ -450,7 +454,7 @@ static void SDLSetMode(INT32 width, INT32 height, INT32 bpp, Uint32 flags)
 	SDL_DC_EmulateMouse(SDL_FALSE);
 	SDL_DC_EmulateKeyboard(SDL_TRUE);
 #endif
-#if defined(HAVE_GP2XSDL) || defined(GCW0) || defined(BITTBOY) || defined(OGA) || defined(FUNKEY) || defined(RS1) 
+#if defined(HAVE_GP2XSDL) || defined(GCW0) || defined(BITTBOY) || defined(OGA) || defined(FUNKEY) || defined(RS1) || defined(WII)
 	SDL_ShowCursor(SDL_DISABLE); //For GP2X Open2x
 #endif
 #ifdef FILTERS
@@ -1447,7 +1451,7 @@ void I_UpdateNoBlit(void)
 #if defined(FUNKEY) || defined(RS1)
 	SDL_SoftStretch(vidSurface, NULL, real_screen, NULL);
 	SDL_UpdateRect(real_screen, 0, 0, 0, 0);
-#elif defined(GCW0) || defined(BITTBOY)
+#elif defined(GCW0) || defined(BITTBOY) || defined(WII)
 	SDL_Flip(vidSurface);
 #else
 	if (!vidSurface)
@@ -1511,7 +1515,7 @@ static inline SDL_bool SDLmatchVideoformat(void)
 //
 void I_FinishUpdate(void)
 {
-#if defined(GCW0) || defined(BITTBOY)
+#if defined(GCW0) || defined(BITTBOY) || defined(WII)
 	if (!vidSurface)
 		return; //Alam: No software or OpenGl surface
 	if (I_SkipFrame())
@@ -1520,7 +1524,7 @@ void I_FinishUpdate(void)
 	if (cv_ticrate.value)
 		SCR_DisplayTicRate();
 
-	#ifndef defined(BITTBOY)
+	#if !defined(BITTBOY)
 	if (vidSurface->format->BitsPerPixel == 8)
 	{
 		SDL_UnlockSurface(vidSurface);
@@ -2225,21 +2229,15 @@ void I_StartupGraphics(void)
 #endif
 	if (render_soft == rendermode)
 	{
-#if defined(_WII)
-		vid.width = 640;
-		vid.height = 480;
-#elif defined(_PS3)
+#if defined(_PS3)
 		vid.width = 720;
 		vid.height = 480;
-#elif defined(BITTBOY)
+#elif defined(BITTBOY) || defined(WII) || defined(GCW0)
 		vid.width = 320;
 		vid.height = 240;
 #elif defined(OGA)
 		vid.width = 480;
 		vid.height = 320;
-#elif defined(GCW0)
-		vid.width = 320;
-		vid.height = 240;
 #elif defined(RS1)
 		vid.width = 640;
 		vid.height = 480;

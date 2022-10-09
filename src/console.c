@@ -408,7 +408,7 @@ static void CON_SetupColormaps(void)
 
 // Setup the console text buffer
 //
-void CON_Init(void)
+void CON_Init_Game(void)
 {
 	INT32 i;
 

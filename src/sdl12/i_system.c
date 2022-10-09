@@ -168,14 +168,14 @@ void __set_fpscr(long); // in libgcc / kernel's startup.s?
 #define DEFAULTWADLOCATION4 "/tmp/mnt/sd/SRB2"
 #define DEFAULTSEARCHPATH1 "/mnt/sd"
 #define DEFAULTSEARCHPATH2 "/tmp/mnt/sd"
-#elif defined (_WII)
+#elif defined (_WII) || defined(WII)
 #define NOCWD
 #define NOHOME
 #define NEED_SDL_GETENV
-#define DEFAULTWADLOCATION1 "sd:/srb2wii"
-#define DEFAULTWADLOCATION2 "usb:/srb2wii"
-#define DEFAULTSEARCHPATH1 "sd:/srb2wii"
-#define DEFAULTSEARCHPATH2 "usb:/srb2wii"
+#define DEFAULTWADLOCATION1 "sd:/srb2pmwii"
+#define DEFAULTWADLOCATION2 "usb:/srb2pmwii"
+#define DEFAULTSEARCHPATH1 "sd:/srb2pmwii"
+#define DEFAULTSEARCHPATH2 "usb:/srb2pmwii"
 // PS3: TODO: this will need modification most likely
 #elif defined (_PS3)
 #define NOCWD
@@ -2173,8 +2173,8 @@ int TimeFunction(int requested_frequency)
 	static Uint64 basetime = 0;
 	       Uint64 ticks = timer_ms_gettime64(); //using timer_ms_gettime64 instand of SDL_GetTicks for the Dreamcast
 #else
-	static Uint64 basetime = 0;
-	       Uint64 ticks = SDL_GetTicks();
+	static uint64_t basetime = 0;
+	       uint64_t ticks = SDL_GetTicks();
 #endif
 
 	if (!basetime)
@@ -2524,6 +2524,7 @@ static void Shittycopyerror(const char *name)
 
 static void Shittylogcopy(void)
 {
+	#ifdef LOGMESSAGES
 	char buf[8192];
 	FILE *fp;
 	size_t r;
@@ -2551,6 +2552,7 @@ static void Shittylogcopy(void)
 	{
 		Shittycopyerror(logfilename);
 	}
+	#endif
 }
 #endif/*!(defined (__unix__) || defined(__APPLE__) || defined (UNIXCOMMON))*/
 

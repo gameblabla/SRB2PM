@@ -1310,7 +1310,7 @@ void D_SRB2Main(void)
 
 	HU_Init();
 
-	CON_Init();
+	CON_Init_Game();
 
 	D_RegisterServerCommands();
 	D_RegisterClientCommands(); // be sure that this is called before D_CheckNetGame
@@ -1447,7 +1447,7 @@ void D_SRB2Main(void)
 
 //using a file that doesn't exist causes issues on wiiu, because, um, hm,
 //TODO actually fix this
-#ifndef __WIIU__
+#if !defined(__WIIU__) || !defined(WII)
 	// user settings come before "+" parameters.
 	if (dedicated)
 		COM_ImmedExecute(va("exec \"%s"PATHSEP"adedserv.cfg\"\n", srb2home));

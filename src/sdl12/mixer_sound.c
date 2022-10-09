@@ -817,7 +817,11 @@ musictype_t I_SongType(void)
 #endif
 		return MU_MID;
 	}
-	else if (Mix_GetMusicType(music) == MUS_MOD || Mix_GetMusicType(music) == MUS_MODPLUG)
+	else if (Mix_GetMusicType(music) == MUS_MOD 
+#ifndef WII
+	|| Mix_GetMusicType(music) == MUS_MODPLUG
+#endif
+	)
 		return MU_MOD;
 	else if (Mix_GetMusicType(music) == MUS_MP3 || Mix_GetMusicType(music) == MUS_MP3_MAD)
 		return MU_MP3;

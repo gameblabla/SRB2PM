@@ -625,7 +625,9 @@ extern const char *compdate, *comptime, *comprevision, *compbranch;
 /// on the bright side it fixes some weird issues with translucent walls
 /// \note	SRB2CB port.
 ///      	SRB2CB itself ported this from PrBoom+
+#if !defined(LOWMEM)
 #define NEWCLIP
+#endif
 
 /// OpenGL shaders
 #define GL_SHADERS
@@ -648,7 +650,9 @@ extern const char *compdate, *comptime, *comprevision, *compbranch;
 #define WALLFLATS
 
 /// Maintain compatibility with older 2.2 demos
+#if !defined(LOWMEM)
 #define OLD22DEMOCOMPAT
+#endif
 
 #if defined (HAVE_CURL) && ! defined (NONET)
 #define MASTERSERVER

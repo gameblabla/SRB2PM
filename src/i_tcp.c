@@ -1512,4 +1512,6 @@ boolean I_InitTcpNetwork(void)
 	return ret;
 }
 
-#include "i_addrinfo.cp"
+#ifndef NONET
+#include "i_addrinfo_c.h"
+#endif

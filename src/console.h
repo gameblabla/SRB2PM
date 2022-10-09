@@ -14,7 +14,7 @@
 #include "command.h"
 #include "i_threads.h"
 
-void CON_Init(void);
+void CON_Init_Game(void);
 
 boolean CON_Responder(event_t *ev);
 
