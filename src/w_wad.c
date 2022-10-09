@@ -1923,6 +1923,9 @@ static lumpchecklist_t folderblacklist[] =
 static int
 W_VerifyPK3 (FILE *fp, lumpchecklist_t *checklist, boolean status)
 {
+#ifndef VERIFY_PK3
+	return true;
+#else
 	int verified = true;
 
     zend_t zend;
@@ -1959,9 +1962,9 @@ W_VerifyPK3 (FILE *fp, lumpchecklist_t *checklist, boolean status)
 
 	data_size = sizeof zend;
 
-	numlumps = SHORT(zend.entries);
+	numlumps = zend.entries;
 
-	fseek(fp, LONG(zend.cdiroffset), SEEK_SET);
+	fseek(fp, zend.cdiroffset, SEEK_SET);
 	for (i = 0; i < numlumps; i++)
 	{
 		char* fullname;
@@ -1975,8 +1978,8 @@ W_VerifyPK3 (FILE *fp, lumpchecklist_t *checklist, boolean status)
 
 		if (verified == true)
 		{
-			fullname = malloc(SHORT(zentry.namelen) + 1);
-			if (fgets(fullname, SHORT(zentry.namelen) + 1, fp) != fullname)
+			fullname = malloc(zentry.namelen + 1);
+			if (fgets(fullname, zentry.namelen + 1, fp) != fullname)
 				return true;
 
 			// Strip away file address and extension for the 8char name.
@@ -2004,28 +2007,28 @@ W_VerifyPK3 (FILE *fp, lumpchecklist_t *checklist, boolean status)
 			free(fullname);
 
 			// skip and ignore comments/extra fields
-			if (fseek(fp, SHORT(zentry.xtralen) + SHORT(zentry.commlen), SEEK_CUR) != 0)
+			if (fseek(fp, zentry.xtralen + zentry.commlen, SEEK_CUR) != 0)
 				return true;
 		}
 		else
 		{
-			if (fseek(fp, SHORT(zentry.namelen) + SHORT(zentry.xtralen) + SHORT(zentry.commlen), SEEK_CUR) != 0)
+			if (fseek(fp, zentry.namelen + zentry.xtralen + zentry.commlen, SEEK_CUR) != 0)
 				return true;
 		}
 
 		data_size +=
-			sizeof zentry + SHORT(zentry.namelen) + SHORT(zentry.xtralen) + SHORT(zentry.commlen);
+			sizeof zentry + zentry.namelen + zentry.xtralen + zentry.commlen;
 
 		old_position = ftell(fp);
 
-		if (fseek(fp, LONG(zentry.offset), SEEK_SET) != 0)
+		if (fseek(fp, zentry.offset, SEEK_SET) != 0)
 			return true;
 
 		if (fread(&zlentry, 1, sizeof(zlentry_t), fp) < sizeof (zlentry_t))
 			return true;
 
 		data_size +=
-			sizeof zlentry + SHORT(zlentry.namelen) + SHORT(zlentry.xtralen) + LONG(zlentry.compsize);
+			sizeof zlentry + zlentry.namelen + zlentry.xtralen + zlentry.compsize;
 
 		fseek(fp, old_position, SEEK_SET);
 	}
@@ -2046,6 +2049,7 @@ W_VerifyPK3 (FILE *fp, lumpchecklist_t *checklist, boolean status)
 	{
 		return verified;
 	}
+#endif
 }
 
 // Note: This never opens lumps themselves and therefore doesn't have to
@@ -2190,19 +2194,19 @@ virtres_t* vres_GetMap(lumpnum_t lumpnum)
 	{
 		// Remember that we're assuming that the WAD will have a specific set of lumps in a specific order.
 		UINT8 *wadData = W_CacheLumpNum(lumpnum, PU_LEVEL);
-		filelump_t *fileinfo = (filelump_t *)(wadData + LONG(((wadinfo_t *)wadData)->infotableofs));
-		numlumps = LONG(((wadinfo_t *)wadData)->numlumps);
+		filelump_t *fileinfo = (filelump_t *)(wadData + ((wadinfo_t *)wadData)->infotableofs);
+		numlumps = ((wadinfo_t *)wadData)->numlumps;
 		vlumps = Z_Malloc(sizeof(virtlump_t)*numlumps, PU_LEVEL, NULL);
 
 		// Build the lumps.
 		for (i = 0; i < numlumps; i++)
 		{
-			vlumps[i].size = (size_t)(LONG(((filelump_t *)(fileinfo + i))->size));
+			vlumps[i].size = (size_t)(((filelump_t *)(fileinfo + i))->size);
 			// Play it safe with the name in this case.
 			memcpy(vlumps[i].name, (fileinfo + i)->name, 8);
 			vlumps[i].name[8] = '\0';
 			vlumps[i].data = Z_Malloc(vlumps[i].size, PU_LEVEL, NULL); // This is memory inefficient, sorry about that.
-			memcpy(vlumps[i].data, wadData + LONG((fileinfo + i)->filepos), vlumps[i].size);
+			memcpy(vlumps[i].data, wadData + (fileinfo + i)->filepos, vlumps[i].size);
 		}
 
 		Z_Free(wadData);
