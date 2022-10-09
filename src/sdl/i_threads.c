@@ -1,3 +1,4 @@
+#if 0
 // SONIC ROBO BLAST 2
 //-----------------------------------------------------------------------------
 // Copyright (C) 2020-2021 by James R.
@@ -354,3 +355,4 @@ I_wake_all_cond (
 	if (SDL_CondBroadcast(cond) == -1)
 		abort();
 }
+#endif

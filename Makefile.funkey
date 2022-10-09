@@ -12,7 +12,7 @@ CFLAGS		+= -DDIRECTFULLSCREEN  -DHAVE_MIXER -DHAVE_PNG -DNONET
 CFLAGS		+= -DHAVE_SDL -DHAVE_ZLIB -DNONX86 -DNORUSEASM -DFUNKEY -DGCW0 -DGCW
 CFLAGS		+= -DSOUND=SOUND_MIXER
 
-CFLAGS		+= -Ofast -fno-stack-protector -flto -fno-PIC
+CFLAGS		+= -Os -fno-stack-protector -flto -fno-PIC
 
 LDFLAGS     = -lc -lrt -lSDLmain -lSDL -lSDL_mixer -lmikmod -logg -lvorbisfile -lmpg123 -lm -lz -lpng
 LDFLAGS	   += -s -flto
